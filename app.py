@@ -9,15 +9,15 @@ app.secret_key = 'lms2025'
 db_config = {
     'host': '10.0.116.125', 
     'user': 'cs432g8', 
-    'password': 'X7mLpNZq',
+    'password': 'X7mLpNZq', 
     'database': 'cs432g8' 
-}
-
+}    
+  
 def get_db_connection():
-    return mysql.connector.connect(**db_config)
-
-@app.route('/')
-def home():
+    return mysql.connector.connect(**db_config) 
+ 
+@app.route('/')  
+def home():  
     return redirect(url_for('login')) 
 
 
@@ -36,17 +36,17 @@ def login():
         conn.close()
 
         if user and check_password_hash(user['password'], password):
-            session['username'] = user['username']
-            session['role'] = user['role']  
+            session['username'] = user['username'] 
+            session['role'] = user['role']   
             flash('Login successful!')
             return redirect(url_for('dashboard'))
         else:
-            error = "Invalid username or password"
+            error = "Invalid username or password" 
     return render_template('login.html', error=error)
 
 
-from functools import wraps
-from flask import redirect, url_for, flash
+from functools import wraps   
+from flask import redirect, url_for, flash  
 
 def admin_required(f):
     @wraps(f)
@@ -64,6 +64,34 @@ def dashboard():
         return render_template('dashboard.html', username=session['username'])
     return redirect(url_for('login'))
 
+@app.route('/view_table/', methods=['GET', 'POST'])
+@admin_required
+def view_table():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    print("Connected to the database")
+
+    # Get all table names
+    cursor.execute("SHOW TABLES")
+    table_names = [row[0] for row in cursor.fetchall()]
+
+    selected_table = None
+    columns = []
+    rows = []
+
+    if request.method == 'POST':
+        selected_table = request.form.get('table_name')
+        try:
+            cursor.execute(f"SELECT * FROM {selected_table}")
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+        except Exception as e:
+            flash(f"Error loading table {selected_table}: {e}", 'danger')
+
+    cursor.close()
+    conn.close()
+    return render_template('view_table.html', table_names=table_names, selected_table=selected_table, columns=columns, rows=rows)
+ 
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -156,7 +184,7 @@ def auth_user():
         return {'status': 'fail', 'message': 'Missing credentials'}, 400
 
     username = data['username']
-    password = data['password']
+    password = data['password'] 
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
@@ -197,20 +225,13 @@ def delete_member():
 
     return render_template('delete_member.html')
 
-
-@app.route('/view_table/<table>')
+  
+@app.route('/data')
 @admin_required
-def view_table(table):
-    try:
-        data = db.execute(f"SELECT * FROM {table}").fetchall()
-        columns = [col[0] for col in db.execute(f"PRAGMA table_info({table})")]
-    except Exception as e:
-        flash(f"Error loading table: {e}", "danger") 
-        return redirect(url_for('admin_dashboard'))
-    
-    return render_template('view_table.html', table_name=table, columns=columns, rows=data)
-
-
+def data_dashboard():
+    table_names = ['MEMBERS', 'login', 'BOOKS_DETAILS', 'BOOK_AVAILABILITY', 'DIGITAL_BOOKS']
+    return render_template('data_dashboard.html', tables=table_names)
+     
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)         
