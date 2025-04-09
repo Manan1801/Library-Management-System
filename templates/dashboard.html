@@ -8,3 +8,8 @@
     <a href="{{ url_for('logout') }}">Logout</a>
 </body>
 </html>
+
+{% if session['role'] == 'admin' %}
+    <a href="{{ url_for('add_member') }}">Add Member</a><br>
+    <a href="{{ url_for('delete_member') }}">Delete Member</a><br>
+{% endif %}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Delete Member</title>
+</head>
+<body>
+    <h2>Delete Member</h2>
+
+    <form method="POST">
+        <label for="username">Username (Email):</label>
+        <input type="text" name="username" required>
+        <button type="submit">Delete</button>
+    </form>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul>
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</body>
+</html>

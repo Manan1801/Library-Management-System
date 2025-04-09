@@ -20,31 +20,43 @@ def get_db_connection():
 def home():
     return redirect(url_for('login')) 
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
-    print(request.method)
     if request.method == 'POST':
-        print(request.form)
         username = request.form['username']
-        password = (request.form['password'])
+        password = request.form['password']
 
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        query = "SELECT * FROM login WHERE username = %s "
-        cursor.execute(query, (username,))
+        cursor.execute("SELECT * FROM login WHERE username = %s", (username,))
         user = cursor.fetchone()
         cursor.close()
         conn.close()
-        print(user)
+
         if user and check_password_hash(user['password'], password):
             session['username'] = user['username']
-            print(session['username'])
+            session['role'] = user['role']  
             flash('Login successful!')
             return redirect(url_for('dashboard'))
         else:
             error = "Invalid username or password"
     return render_template('login.html', error=error)
+
+
+from functools import wraps
+from flask import redirect, url_for, flash
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'role' not in session or session['role'] != 'admin':
+            flash("Admin access required.")
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs) 
+    return decorated_function
+
   
 @app.route('/dashboard')
 def dashboard():
@@ -52,10 +64,6 @@ def dashboard():
         return render_template('dashboard.html', username=session['username'])
     return redirect(url_for('login'))
 
-@app.route('/logout')
-def logout():
-    session.pop('username', None)
-    return redirect(url_for('login'))
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -89,6 +97,7 @@ def register():
     return render_template('register.html')
 
 @app.route('/add_member', methods=['GET', 'POST'])
+@admin_required
 def add_member():
     if request.method == 'POST':
         name = request.form['name']
@@ -133,6 +142,12 @@ def add_member():
     return render_template('add_member.html')
 
 
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
 @app.route('/authUser', methods=['POST'])
 def auth_user():
     data = request.json
@@ -157,6 +172,45 @@ def auth_user():
         return {'status': 'success', 'token': token}, 200
     else:
         return {'status': 'fail', 'message': 'Invalid credentials'}, 401
+    
+
+@app.route('/delete_member', methods=['GET', 'POST'])
+@admin_required
+def delete_member():
+    if request.method == 'POST':
+        username = request.form['username']
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # First delete from login table
+        cursor.execute("DELETE FROM login WHERE username = %s", (username,))
+
+        # Then delete from members table
+        cursor.execute("DELETE FROM MEMBERS WHERE Email = %s", (username,))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        flash('Member deleted successfully!')
+
+    return render_template('delete_member.html')
+
+
+@app.route('/view_table/<table>')
+@admin_required
+def view_table(table):
+    try:
+        data = db.execute(f"SELECT * FROM {table}").fetchall()
+        columns = [col[0] for col in db.execute(f"PRAGMA table_info({table})")]
+    except Exception as e:
+        flash(f"Error loading table: {e}", "danger") 
+        return redirect(url_for('admin_dashboard'))
+    
+    return render_template('view_table.html', table_name=table, columns=columns, rows=data)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True)
