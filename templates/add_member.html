@@ -1,24 +1,63 @@
-<!-- templates/add_member.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Add Member</title>
+    <meta charset="UTF-8">
+    <title>Add New Member</title>
+    <link rel="stylesheet" href="/static/add_member.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
+
+<div class="form-container">
     <h2>Add New Member</h2>
-    <form method="POST">
-        <label>Name:</label><input type="text" name="name" required><br>
-        <label>Date of Birth:</label><input type="date" name="dob" required><br>
-        <label>Email:</label><input type="email" name="email" required><br>
-        <label>Contact Details:</label><input type="text" name="contact" required><br>
-        <label>Program:</label><input type="text" name="program" required><br>
-        <label>Branch:</label><input type="text" name="branch" required><br>
-        <label>Year of Admission:</label><input type="number" name="admission" required><br>
-        <label>Year of Graduation:</label><input type="number" name="graduation" required><br>
-        <label>Username:</label><input type="text" name="username" required><br>
-        <label>Password:</label><input type="password" name="password" required><br>
+    <form method="POST" action="{{ url_for('add_member') }}">
+        <div class="form-group">
+            <label for="name">Name:</label>
+            <input type="text" name="name" required>
+        </div>
+
+        <div class="form-group">
+            <label for="dob">Date of Birth:</label>
+            <input type="date" name="dob" required>
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" name="email" required>
+        </div>
+
+        <div class="form-group">
+            <label for="contact">Contact Details:</label>
+            <input type="text" name="contact" required>
+        </div>
+
+        <div class="form-group">
+            <label for="program">Program:</label>
+            <input type="text" name="program" required>
+        </div>
+
+        <div class="form-group">
+            <label for="branch">Branch:</label>
+            <input type="text" name="branch" required>
+        </div>
+
+        <div class="form-group">
+            <label for="admission_year">Year of Admission:</label>
+            <input type="number" name="admission_year" min="1900" max="2100" required>
+        </div>
+
+        <div class="form-group">
+            <label for="graduation_year">Year of Graduation:</label>
+            <input type="number" name="graduation_year" min="1900" max="2100" required>
+        </div>
+
         <input type="submit" value="Add Member">
     </form>
-    <p>{{ message }}</p>
+
+    {% if message %}
+        <p class="message">{{ message }}</p>
+    {% endif %}
+</div>
+
 </body>
 </html>
