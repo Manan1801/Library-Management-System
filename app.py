@@ -1,12 +1,11 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import mysql.connector
 import sqlite3
-from werkzeug.security import generate_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = 'lms2025'  # Replace with a strong secret key
+app.secret_key = 'lms2025' 
 
-# MySQL DB Config
 db_config = {
     'host': '10.0.116.125', 
     'user': 'cs432g8',
@@ -19,28 +18,34 @@ def get_db_connection():
 
 @app.route('/')
 def home():
-    return redirect(url_for('login'))
+    return redirect(url_for('login')) 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     error = None
+    print(request.method)
     if request.method == 'POST':
+        print(request.form)
         username = request.form['username']
-        password = request.form['password']
+        password = (request.form['password'])
+
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        query = "SELECT * FROM login WHERE username = %s AND password = %s"
-        cursor.execute(query, (username, password))
+        query = "SELECT * FROM login WHERE username = %s "
+        cursor.execute(query, (username,))
         user = cursor.fetchone()
         cursor.close()
         conn.close()
-        if user:
+        print(user)
+        if user and check_password_hash(user['password'], password):
             session['username'] = user['username']
+            print(session['username'])
+            flash('Login successful!')
             return redirect(url_for('dashboard'))
         else:
             error = "Invalid username or password"
     return render_template('login.html', error=error)
- 
+  
 @app.route('/dashboard')
 def dashboard():
     if 'username' in session:
