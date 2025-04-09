@@ -68,7 +68,7 @@ def register():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Check if user already exists
+        # Check if user already exists 
         cursor.execute('SELECT * FROM login WHERE username = %s', (username,))
         existing_user = cursor.fetchone()
 
@@ -87,6 +87,56 @@ def register():
         return redirect(url_for('login'))
 
     return render_template('register.html')
+
+
+@app.route('/add_member', methods=['GET', 'POST'])
+def add_member():
+    message = ''
+    if request.method == 'POST':
+        name = request.form['name']
+        dob = request.form['dob']
+        email = request.form['email']
+        contact = request.form['contact']
+        program = request.form['program']
+        branch = request.form['branch']
+        admission = request.form['admission']
+        graduation = request.form['graduation']
+        username = request.form['username']
+        password = request.form['password']
+
+        hashed_password = generate_password_hash(password)
+
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+
+            # Insert into members table
+            insert_member = '''
+                INSERT INTO MEMBERS
+                (Name, Date_of_Birth, Email, Contact_Details, Program, Branch, Year_of_Admission, Year_of_Graduation)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            '''
+            cursor.execute(insert_member, (name, dob, email, contact, program, branch, admission, graduation))
+
+            # Insert into login table with typed username & hashed password
+            insert_login = '''
+                INSERT INTO login (username, password)
+                VALUES (%s, %s)
+            '''
+            cursor.execute(insert_login, (username, hashed_password))
+
+            conn.commit()
+            message = 'Member and login added successfully.'
+
+        except mysql.connector.Error as err:
+            conn.rollback()
+            message = f"Error: {err}"
+
+        finally:
+            cursor.close()
+            conn.close()
+
+    return render_template('add_member.html', message=message)
 
 
 if __name__ == '__main__':

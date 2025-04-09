@@ -1,0 +1,24 @@
+<!-- templates/add_member.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Member</title>
+</head>
+<body>
+    <h2>Add New Member</h2>
+    <form method="POST">
+        <label>Name:</label><input type="text" name="name" required><br>
+        <label>Date of Birth:</label><input type="date" name="dob" required><br>
+        <label>Email:</label><input type="email" name="email" required><br>
+        <label>Contact Details:</label><input type="text" name="contact" required><br>
+        <label>Program:</label><input type="text" name="program" required><br>
+        <label>Branch:</label><input type="text" name="branch" required><br>
+        <label>Year of Admission:</label><input type="number" name="admission" required><br>
+        <label>Year of Graduation:</label><input type="number" name="graduation" required><br>
+        <label>Username:</label><input type="text" name="username" required><br>
+        <label>Password:</label><input type="password" name="password" required><br>
+        <input type="submit" value="Add Member">
+    </form>
+    <p>{{ message }}</p>
+</body>
+</html>
