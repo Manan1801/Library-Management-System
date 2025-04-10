@@ -270,6 +270,8 @@ def isValidSession(session_id):
     cursor.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
     result = cursor.fetchone()
     conn.close()
+    # print("Session ID:", session_id)
+    # print(result)
     return result is not None
 
 @app.route('/login', methods=['POST'])
@@ -293,29 +295,20 @@ def login_user():
         conn.close()
         return jsonify({'error': 'Invalid credentials'}), 401
     
-    
-@app.route('/get_books', methods=['GET'])
-def get_books():
-    session_id = request.headers.get('session_id')
-
-    if not isValidSession(session_id):
-        log_unauthorized_access("Unknown", "get_books")
-        return jsonify({'error': 'Unauthorized'}), 403
-
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    books = cursor.execute("SELECT * FROM books").fetchall()
-    conn.close()
-
-    book_list = [{'id': row[0], 'title': row[1], 'author': row[2]} for row in books]
-    return jsonify(book_list)
-
 
 @app.route('/books', methods=['POST'])
 def ADD_book():
+    data = request.get_json()
     session_id = request.headers.get('Session-ID')
 
+    print("Headers:", request.headers)
+    print("JSON Body:", request.get_json())
+
+
     # Session check
+    print("Session ID:", session_id)
+    # print(isValidSession(session_id))
+    # print(is_admin(session_id))
     if not isValidSession(session_id) or not is_admin(session_id):
         log_unauthorized_access("POST /books", "add_book")
         return jsonify({'error': 'Unauthorized'}), 401
@@ -335,8 +328,8 @@ def ADD_book():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO BOOK_DETAILS
-            (Book_Name, Book_Author, Book_Publication_Year, Total_Reviews, Quantity, Book_Genre) 
+            INSERT INTO BOOKS_DETAILS
+            (Book_Name, Book_Author, Book_Publication_Year, Total_Reviews, Quantity, BOOK_GENRE) 
             VALUES (%s, %s, %s, %s, %s, %s)
         """, (name, author, year, reviews, quantity, genre))
 
@@ -347,7 +340,106 @@ def ADD_book():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/borrow/<int:book_id>', methods=['POST'])
+def borrow_book(book_id):
+    session_id = request.headers.get('Session-ID')
+
+    if not isValidSession(session_id):
+        log_unauthorized_access("POST /borrow", f"book_id={book_id}")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Check current quantity
+        cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            conn.close()
+            return jsonify({'error': 'Book not found'}), 404
+
+        quantity = result[0]
+
+        if quantity <= 0:
+            conn.close()
+            return jsonify({'error': 'Book not available'}), 400
+
+        # Update quantity
+        new_quantity = quantity - 1
+        availability = 'Available' if new_quantity > 0 else 'Not Available'
+
+        cursor.execute("""
+            UPDATE BOOK_AVAILABILITY
+            SET Quantity_Remaining = %s, Availability = %s
+            WHERE BookID = %s
+        """, (new_quantity, availability, book_id))
+        conn.commit()
+        conn.close()
+
+        return jsonify({'message': 'Book borrowed successfully'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
     
 
+@app.route('/books', methods=['GET'])
+def get_books():
+    session_id = request.headers.get('Session-ID')
+    if not isValidSession(session_id):
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM BOOK_DETAILS")
+    books = cursor.fetchall()
+    conn.close()
+    return jsonify(books), 200
+
+
+
+@app.route('/books/<int:book_id>', methods=['PUT'])
+def update_book(book_id):
+    session_id = request.headers.get('Session-ID')
+
+    if not isValidSession(session_id) or not is_admin(session_id):
+        log_unauthorized_access("PUT /books", "update_book")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json()
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        fields = []
+        values = []
+
+        for key in ['Book_Name', 'Book_Author', 'Book_Publication_Year', 'Total_Reviews', 'Quantity', 'BOOK_GENRE']:
+            if key in data:
+                fields.append(f"{key} = %s")
+                values.append(data[key])
+
+        if not fields:
+            return jsonify({'error': 'No fields to update'}), 400
+
+        values.append(book_id)
+        query = f"UPDATE BOOKS_DETAILS SET {', '.join(fields)} WHERE Book_ID = %s"
+        cursor.execute(query, tuple(values)) 
+
+        conn.commit()
+        conn.close()
+
+        if cursor.rowcount == 0:
+            return jsonify({'error': 'Book not found'}), 404
+
+        return jsonify({'message': 'Book updated successfully'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
-    app.run(debug=True)         
+    app.run(debug=True)            
