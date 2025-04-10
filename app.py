@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import  request, jsonify
 import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
+from session_utils import log_unauthorized_access
 
 app = Flask(__name__)
 app.secret_key = 'lms2025' 
@@ -20,6 +22,26 @@ def get_db_connection():
 def home():  
     return redirect(url_for('login')) 
 
+def is_admin(session_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # First get the username linked to this session
+    cursor.execute("SELECT username FROM sessions WHERE session_id = %s", (session_id,))
+    result = cursor.fetchone()
+
+    if result:
+        username = result[0]
+        # Now check if this user is admin
+        cursor.execute("SELECT role FROM login WHERE username = %s", (username,))
+        role_result = cursor.fetchone()
+        conn.close()
+        if role_result and role_result[0] == 'admin':
+            return True
+
+    conn.close()
+    return False
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -32,17 +54,27 @@ def login():
         cursor = conn.cursor(dictionary=True)
         cursor.execute("SELECT * FROM login WHERE username = %s", (username,))
         user = cursor.fetchone()
-        cursor.close()
-        conn.close()
 
         if user and check_password_hash(user['password'], password):
-            session['username'] = user['username'] 
-            session['role'] = user['role']   
+            session_id = str(uuid.uuid4())
+            
+            cursor.execute("INSERT INTO sessions (username, session_id,role) VALUES (%s, %s,%s)", (username, session_id,user['role']))
+            conn.commit()
+
+            session['username'] = user['username']
+            session['role'] = user['role']
+            session['session_id'] = session_id  # store in Flask session
+
+            cursor.close()
+            conn.close()
             flash('Login successful!')
             return redirect(url_for('dashboard'))
         else:
-            error = "Invalid username or password" 
+            error = "Invalid username or password"
+            cursor.close()
+            conn.close()
     return render_template('login.html', error=error)
+
 
 
 from functools import wraps   
@@ -56,10 +88,10 @@ def admin_required(f):
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs) 
     return decorated_function
-
+ 
   
-@app.route('/dashboard')
-def dashboard():
+@app.route('/dashboard') 
+def dashboard(): 
     if 'username' in session:
         return render_template('dashboard.html', username=session['username'])
     return redirect(url_for('login'))
@@ -231,7 +263,91 @@ def delete_member():
 def data_dashboard():
     table_names = ['MEMBERS', 'login', 'BOOKS_DETAILS', 'BOOK_AVAILABILITY', 'DIGITAL_BOOKS']
     return render_template('data_dashboard.html', tables=table_names)
-     
+
+def isValidSession(session_id):
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM sessions WHERE session_id = %s", (session_id,))
+    result = cursor.fetchone()
+    conn.close()
+    return result is not None
+
+@app.route('/login', methods=['POST'])
+def login_user():
+    data = request.get_json()
+    username = data['username']
+    password = data['password']
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("SELECT * FROM login WHERE username = ? AND password = ?", (username, password))
+    user = cursor.fetchone()
+
+    if user:
+        session_id = str(uuid.uuid4())
+        cursor.execute("INSERT INTO sessions (username, session_id) VALUES (?, ?)", (username, session_id))
+        conn.commit()
+        conn.close()
+        return jsonify({'session_id': session_id}), 200
+    else:
+        conn.close()
+        return jsonify({'error': 'Invalid credentials'}), 401
+    
+    
+@app.route('/get_books', methods=['GET'])
+def get_books():
+    session_id = request.headers.get('session_id')
+
+    if not isValidSession(session_id):
+        log_unauthorized_access("Unknown", "get_books")
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    books = cursor.execute("SELECT * FROM books").fetchall()
+    conn.close()
+
+    book_list = [{'id': row[0], 'title': row[1], 'author': row[2]} for row in books]
+    return jsonify(book_list)
+
+
+@app.route('/books', methods=['POST'])
+def ADD_book():
+    session_id = request.headers.get('Session-ID')
+
+    # Session check
+    if not isValidSession(session_id) or not is_admin(session_id):
+        log_unauthorized_access("POST /books", "add_book")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    data = request.get_json()
+
+    # Get book fields
+    name = data.get('Book_Name')
+    author = data.get('Book_Author')
+    year = data.get('Book_Publication_Year')
+    reviews = data.get('Total_Reviews', 0)  # Default to 0 if not provided
+    quantity = data.get('Quantity')
+    genre = data.get('BOOK_GENRE')
+
+    # Insert into DB
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO BOOK_DETAILS
+            (Book_Name, Book_Author, Book_Publication_Year, Total_Reviews, Quantity, Book_Genre) 
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (name, author, year, reviews, quantity, genre))
+
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Book added successfully'}), 201
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    
 
 if __name__ == '__main__':
     app.run(debug=True)         
