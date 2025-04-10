@@ -393,7 +393,7 @@ def get_books():
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM BOOK_DETAILS")
+    cursor.execute("SELECT * FROM BOOKS_DETAILS")
     books = cursor.fetchall()
     conn.close()
     return jsonify(books), 200
@@ -437,6 +437,54 @@ def update_book(book_id):
 
         return jsonify({'message': 'Book updated successfully'}), 200
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+
+@app.route('/notifications', methods=['POST'])
+def send_notification():
+    data = request.get_json()
+    session_id = request.headers.get('Session-ID')
+
+    if not isValidSession(session_id) or not is_admin(session_id):
+        log_unauthorized_access("POST /notifications", "send_notification")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO NOTIFICATIONS (Member_ID, Message, Notification_Date, Type)
+            VALUES (%s, %s, NOW(), %s)
+        """, (data['Member_ID'], data['Message'], data['Type']))
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Notification sent successfully'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/reserve', methods=['POST'])
+def reserve_book():
+    data = request.get_json()
+    session_id = request.headers.get('Session-ID')
+
+    if not isValidSession(session_id):
+        log_unauthorized_access("POST /reserve", "reserve_book")
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Default reservation expiry: 7 days from today
+        cursor.execute("""
+            INSERT INTO RESERVATIONS (Member_ID, Book_ID, Reservation_Date, Expiry_Date, Status)
+            VALUES (%s, %s, CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY), 'Active')
+        """, (data['Member_ID'], data['Book_ID']))
+        conn.commit()
+        conn.close()
+        return jsonify({'message': 'Book reserved successfully'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
