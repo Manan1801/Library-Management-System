@@ -1,0 +1,46 @@
+{% extends "base_user.html" %}
+
+{% block title %}Reading History{% endblock %}
+
+{% block content %}
+<div class="reading-history">
+    <h1 class="mb-4">My Reading History</h1>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Book Title</th>
+                    <th>Author</th>
+                    <th>Issue Date</th>
+                    <th>Return Date</th>
+                    <th>Review</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for book in history %}
+                <tr>
+                    <td>{{ book.Book_Name }}</td>
+                    <td>{{ book.Book_Author }}</td>
+                    <td>{{ book.Issue_Date.strftime('%d %b %Y') }}</td>
+                    <td>
+                        {% if book.Return_Date %}
+                            {{ book.Return_Date.strftime('%d %b %Y') }}
+                        {% else %}
+                            <span class="text-muted">Not returned</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-primary btn-sm">Add Review</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center">No reading history found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

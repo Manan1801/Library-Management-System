@@ -1,0 +1,51 @@
+{% extends "base_user.html" %}
+
+{% block title %}My Issued Books{% endblock %}
+
+{% block content %}
+<div class="issued-books">
+    <h1 class="mb-4">My Issued Books</h1>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Book Title</th>
+                    <th>Author</th>
+                    <th>Issue Date</th>
+                    <th>Due Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for book in issued_books %}
+                <tr>
+                    <td>{{ book.title }}</td>
+                    <td>{{ book.author }}</td>
+                    <td>{{ book.issue_date.strftime('%d %b %Y') }}</td>
+                    <td class="{% if book.is_overdue %}text-danger{% endif %}">
+                        {{ book.due_date.strftime('%d %b %Y') }}
+                        {% if book.is_overdue %}(Overdue){% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-{% if book.status == 'Issued' %}warning{% else %}success{% endif %}">
+                            {{ book.status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if book.status == 'Issued' %}
+                        <button class="btn btn-success btn-sm">Return</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No books currently issued</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base_user.html" %}
+
+{% block title %}Available Books{% endblock %}
+
+{% block content %}
+<div class="available-books">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Available Books</h1>
+        <form class="d-flex" method="GET" action="{{ url_for('user_books') }}">
+            <input class="form-control me-2" type="search" placeholder="Search books..." name="query">
+            <button class="btn btn-outline-light" type="submit">Search</button>
+        </form>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-3 g-4">
+        {% for book in books %}
+        <div class="col">
+            <div class="card h-100">
+                <img src="{{ url_for('static', filename='covers/' + book.Book_ID|string + '.jpg') }}" 
+                     class="card-img-top" alt="{{ book.Book_Name }}"
+                     onerror="this.src='{{ url_for('static', filename='images/default_cover.jpg') }}'">
+                <div class="card-body">
+                    <h5 class="card-title">{{ book.Book_Name }}</h5>
+                    <p class="card-text text-muted">{{ book.Book_Author }}</p>
+                    <span class="badge bg-{% if book.Availability == 'Available' %}success{% else %}danger{% endif %}">
+                        {{ book.Availability }}
+                    </span>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{{ url_for('user_book_detail', book_id=book.Book_ID) }}" class="btn btn-primary btn-sm">
+                        View Details
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
