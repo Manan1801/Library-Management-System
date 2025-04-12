@@ -1,0 +1,60 @@
+{% extends "base_user.html" %}
+
+{% block title %}My Fines{% endblock %}
+
+{% block content %}
+<div class="fines">
+    <h1 class="mb-4">My Fines</h1>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Book Title</th>
+                    <th>Due Date</th>
+                    <th>Return Date</th>
+                    <th>Fine Amount</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fine in fines %}
+                <tr>
+                    <td>{{ fine.Book_Name }}</td>
+                    <td>{{ fine.Due_Date.strftime('%d %b %Y') }}</td>
+                    <td>{{ fine.Return_Date.strftime('%d %b %Y') }}</td>
+                    <td>₹{{ fine.Fine_Amount }}</td>
+                    <td>
+                        <span class="badge bg-{% if fine.Payment_Status == 'Paid' %}success{% else %}danger{% endif %}">
+                            {{ fine.Payment_Status }}
+                        </span>
+                    </td>
+                    <td>
+                        {% if fine.Payment_Status != 'Paid' %}
+                        <button class="btn btn-primary btn-sm pay-btn" data-fineid="{{ fine.Fine_ID }}">Pay Now</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No fines to display</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.querySelectorAll('.pay-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const fineId = this.getAttribute('data-fineid');
+            // Implement payment processing here
+            alert('Payment would be processed for fine ID: ' + fineId);
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %}

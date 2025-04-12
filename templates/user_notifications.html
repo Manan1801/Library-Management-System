@@ -1,0 +1,26 @@
+{% extends "base_user.html" %}
+
+{% block title %}My Notifications{% endblock %}
+
+{% block content %}
+<div class="notifications">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>My Notifications</h1>
+        <button class="btn btn-danger">Clear All</button>
+    </div>
+
+    <div class="list-group">
+        {% for notification in all_notifications %}
+        <div class="list-group-item {% if notification.Type == 'Overdue Fine' %}list-group-item-warning{% endif %}">
+            <div class="d-flex w-100 justify-content-between">
+                <p class="mb-1">{{ notification.Message }}</p>
+                <small>{{ notification.Notification_Date.strftime('%d %b %Y, %I:%M %p') }}</small>
+            </div>
+            <small class="text-muted">{{ notification.Type }}</small>
+        </div>
+        {% else %}
+        <div class="alert alert-info">No notifications to display</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
