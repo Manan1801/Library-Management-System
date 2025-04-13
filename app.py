@@ -991,14 +991,14 @@ def auth_user():
 @admin_required
 def delete_member():
     if request.method == 'POST':
-        username = request.form['username']  # This is actually the email (based on form)
+        email = request.form['username']  # This is actually the email ID
 
         try:
             cims_conn = get_cims_connection()
             cims_cursor = cims_conn.cursor()
 
-            # Get the MemberID from email (username)
-            cims_cursor.execute("SELECT MemberID FROM members WHERE emailID = %s", (username,))
+            # Step 1: Get the MemberID from the members table using emailID
+            cims_cursor.execute("SELECT ID FROM members WHERE emailID = %s", (email,))
             result = cims_cursor.fetchone()
 
             if result is None:
@@ -1007,20 +1007,23 @@ def delete_member():
 
             member_id = result[0]
 
-            # Delete from Login table using MemberID
+            # Step 2: Delete from Login table using MemberID
             cims_cursor.execute("DELETE FROM Login WHERE MemberID = %s", (member_id,))
 
-            # Delete from Members table using email
-            cims_cursor.execute("DELETE FROM members WHERE emailID = %s", (username,))
+            # Step 3: Delete from members table using ID
+            cims_cursor.execute("DELETE FROM members WHERE ID = %s", (member_id,))
 
             cims_conn.commit()
-            cims_cursor.close()
-            cims_conn.close()
 
             flash('Member deleted successfully!')
 
         except Exception as e:
+            cims_conn.rollback()
             return jsonify({'error': str(e)}), 500
+
+        finally:
+            cims_cursor.close()
+            cims_conn.close()
 
     return render_template('delete_member.html')
 
