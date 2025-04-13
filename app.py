@@ -660,7 +660,10 @@ def register():
             return redirect(url_for('register'))
 
         # Insert new user
-        cursor.execute('INSERT INTO login (username, password) VALUES (%s, %s)', (username, hashed_password))
+        cursor.execute(
+            'INSERT INTO login (username, password, role) VALUES (%s, %s, %s)',
+            (username, hashed_password, 'user')
+        )
         conn.commit()
 
         cursor.close()
