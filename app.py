@@ -424,18 +424,16 @@ def user_notifications():
         cursor.close()
         conn.close()      
 
-@app.route('/user_book_detail/<int:book_id>')
+@app.route('/user_book_detail/<int:book_id>', methods=['GET', 'POST'])
 @login_required
 def user_book_detail(book_id):
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
+    
     try:
         # Get book details
         cursor.execute("""
-            SELECT 
-                bd.*, 
-                ba.Quantity_Remaining, 
-                ba.Availability 
+            SELECT bd.*, ba.Quantity_Remaining, ba.Availability
             FROM BOOKS_DETAILS bd
             JOIN BOOK_AVAILABILITY ba ON bd.Book_ID = ba.BookID
             WHERE bd.Book_ID = %s
@@ -446,13 +444,47 @@ def user_book_detail(book_id):
             flash('Book not found!', 'danger')
             return redirect(url_for('user_books'))
 
-        # Get reviews
+        # Handle review submission
+        if request.method == 'POST':
+            review_text = request.form.get('reviewText', '').strip()
+            member_id = current_user.id
+            
+            if not review_text:
+                flash('Review cannot be empty!', 'danger')
+            elif len(review_text) > 1000:
+                flash('Review is too long (max 1000 characters)', 'danger')
+            else:
+                try:
+                    # Get next Review_ID
+                    cursor.execute("SELECT IFNULL(MAX(Review_ID), 0) + 1 FROM REVIEWS_TABLE")
+                    next_id = cursor.fetchone()['IFNULL(MAX(Review_ID), 0) + 1']
+                    
+                    # Insert review with explicit column names
+                    cursor.execute("""
+                        INSERT INTO REVIEWS_TABLE 
+                        (Review_ID, Book_ID, Member_ID, Review_Date, Review) 
+                        VALUES (%s, %s, %s, CURRENT_DATE(), %s)
+                    """, (next_id, book_id, member_id, review_text))
+                    
+                    # Update review count
+                    cursor.execute("""
+                        UPDATE BOOKS_DETAILS 
+                        SET Total_Reviews = Total_Reviews + 1 
+                        WHERE Book_ID = %s
+                    """, (book_id,))
+                    
+                    conn.commit()
+                    flash('Review submitted successfully!', 'success')
+                except Exception as e:
+                    conn.rollback()
+                    flash(f'Failed to submit review. Error: {str(e)}', 'danger')
+                    app.logger.error(f"Review submission failed: {str(e)}")
+            
+            return redirect(url_for('user_book_detail', book_id=book_id))
+
+        # Get existing reviews
         cursor.execute("""
-            SELECT 
-                r.Review, 
-                r.Rating, 
-                r.Review_Date,
-                m.Name 
+            SELECT r.*, m.Name 
             FROM REVIEWS_TABLE r
             JOIN MEMBERS m ON r.Member_ID = m.Member_ID
             WHERE r.Book_ID = %s
@@ -472,7 +504,8 @@ def user_book_detail(book_id):
     finally:
         cursor.close()
         conn.close()
-
+        
+        
 @app.route('/submit_review/<int:book_id>', methods=['POST'])
 @login_required
 def submit_review(book_id):
@@ -806,6 +839,14 @@ def register():
             cursor.close()
             conn.close()
             return redirect(url_for('register'))
+
+        # Insert new user
+        cursor.execute(
+            'INSERT INTO login (username, password, role) VALUES (%s, %s, %s)',
+            (username, hashed_password, 'user')
+        )
+
+        conn.commit()
 
         cursor.close()
         conn.close()

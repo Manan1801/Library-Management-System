@@ -6,23 +6,22 @@
 <div class="book-details">
     <div class="row">
         <div class="col-md-4">
-            <img src="{{ url_for('static', filename='covers/' + book.Book_ID|string + '.jpg') }}" 
-                 class="img-fluid rounded mb-3" 
-                 onerror="this.src='{{ url_for('static', filename='images/default_cover.jpg') }}'">
             
             <div class="availability mb-3">
                 <span class="badge bg-{% if book.Availability == 'Available' %}success{% else %}danger{% endif %}">
-                    {{ book.Availability }}
+                    {{ book.Availability }} ({{ book.Quantity_Remaining }} left)
                 </span>
             </div>
             
             <div class="d-grid gap-2">
-                <button class="btn btn-primary mb-2" id="reserveBtn">
+                <a href="{{ url_for('reserve_book', book_id=book.Book_ID) }}" 
+                   class="btn btn-primary mb-2 {% if book.Availability != 'Available' %}disabled{% endif %}">
                     Reserve Book
-                </button>
-                <button class="btn btn-success" id="issueBtn">
+                </a>
+                <a href="{{ url_for('issue_book', book_id=book.Book_ID) }}" 
+                   class="btn btn-success {% if book.Availability != 'Available' %}disabled{% endif %}">
                     Issue Book
-                </button>
+                </a>
             </div>
         </div>
         
@@ -33,48 +32,48 @@
             <div class="book-meta mb-4">
                 <p><strong>Published:</strong> {{ book.Book_Publication_Year }}</p>
                 <p><strong>Genre:</strong> {{ book.BOOK_GENRE }}</p>
-                <p><strong>Reviews:</strong> {{ book.Total_Reviews }}</p>
+                <p><strong>Total Reviews:</strong> {{ actual_review_count }}</p>
             </div>
             
-            <div class="book-description mb-4">
-                <h3>Description</h3>
-                <p>{{ book.Description or "No description available." }}</p>
-            </div>
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
             
             <div class="book-reviews mb-4">
                 <h3>Reviews</h3>
                 {% if reviews %}
                     {% for review in reviews %}
-                    <div class="card mb-2">
+                    <div class="card mb-2 {% if review.Member_ID == current_user.id %}border-primary{% endif %}">
                         <div class="card-body">
-                            <h5 class="card-title">{{ review.Name }}</h5>
-                            <div class="rating mb-2">
-                                {% for i in range(5) %}
-                                    <i class="fas fa-star{% if i >= review.Rating %} text-muted{% endif %}"></i>
-                                {% endfor %}
-                            </div>
+                            <h5 class="card-title">
+                                {{ review.Name }}
+                                {% if review.Member_ID == current_user.id %}
+                                    <span class="badge bg-info">Your Review</span>
+                                {% endif %}
+                            </h5>
                             <p class="card-text">{{ review.Review }}</p>
-                            <small class="text-muted">{{ review.Review_Date.strftime('%d %b %Y') }}</small>
+                            <small class="text-muted">{{ review.Review_Date.strftime('%B %d, %Y') }}</small>
                         </div>
                     </div>
                     {% endfor %}
                 {% else %}
-                    <p>No reviews yet.</p>
+                    <p>No reviews yet. Be the first to review!</p>
                 {% endif %}
             </div>
             
             <div class="add-review">
                 <h3>Add Your Review</h3>
-                <form id="reviewForm">
-                    <div class="rating mb-3">
-                        {% for i in range(5, 0, -1) %}
-                        <input type="radio" id="star{{ i }}" name="rating" value="{{ i }}">
-                        <label for="star{{ i }}">★</label>
-                        {% endfor %}
-                    </div>
+                <form method="POST" action="{{ url_for('user_book_detail', book_id=book.Book_ID) }}">
                     <div class="mb-3">
-                        <textarea class="form-control" id="reviewText" rows="3" 
-                                  placeholder="Share your thoughts about this book..."></textarea>
+                        <textarea class="form-control" name="reviewText" rows="3" 
+                                 placeholder="Share your thoughts about this book..." required></textarea>
                     </div>
                     <button type="submit" class="btn btn-primary">Submit Review</button>
                 </form>
@@ -82,18 +81,4 @@
         </div>
     </div>
 </div>
-
-{% block scripts %}
-<script>
-    document.getElementById('reviewForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const rating = document.querySelector('input[name="rating"]:checked').value;
-        const reviewText = document.getElementById('reviewText').value;
-        
-        // Submit review via AJAX
-        alert('Review submitted! Thank you.');
-        this.reset();
-    });
-</script>
-{% endblock %}
 {% endblock %}
