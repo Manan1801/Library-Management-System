@@ -822,44 +822,56 @@ def view_table():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username']    # Full name
+        email = request.form['email']          # Email (used to login)
+        dob = request.form['dob']              # Date of birth
         password = request.form['password']
 
         hashed_password = generate_password_hash(password)
 
-        conn = get_db_connection()
+        conn = get_cims_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Check if user already exists 
-        cursor.execute('SELECT * FROM login WHERE username = %s', (username,))
-        existing_user = cursor.fetchone()
+        try:
+            # Check if email already exists in members table
+            cursor.execute("SELECT * FROM members WHERE emailID = %s", (email,))
+            existing_member = cursor.fetchone()
 
-        if existing_user:
-            flash('Username already exists. Please choose a different one.')
+            if existing_member:
+                flash('User with this email already exists.')
+                return redirect(url_for('register'))
+
+            # Insert into members table
+            cursor.execute(
+                "INSERT INTO members (UserName, emailID, DoB) VALUES (%s, %s, %s)",
+                (username, email, dob)
+            )
+            conn.commit()
+
+            # Get the newly inserted member's ID
+            cursor.execute("SELECT ID FROM members WHERE emailID = %s", (email,))
+            member = cursor.fetchone()
+            member_id = member['ID']
+
+            # Insert into Login table using member_id
+            cursor.execute(
+                "INSERT INTO Login (MemberID, Password, Role) VALUES (%s, %s, %s)",
+                (member_id, hashed_password, 'user')
+            )
+            conn.commit()
+
+            flash('Registration successful. Please log in.')
+            return redirect(url_for('login'))
+
+        except Exception as e:
+            conn.rollback()
+            flash(f"Registration failed: {str(e)}")
+        finally:
             cursor.close()
             conn.close()
-            return redirect(url_for('register'))
-
-        # Insert new user
-        cursor.execute(
-            'INSERT INTO login (username, password, role) VALUES (%s, %s, %s)',
-            (username, hashed_password, 'user')
-        )
-
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-
-        # Use execute_and_log_query to log the INSERT
-        query = 'INSERT INTO login (username, password) VALUES (%s, %s)'
-        params = (username, hashed_password)
-        execute_and_log_query(query, params, table_name="login", operation_type="INSERT")
-
-        flash('Registration successful. Please log in.')
-        return redirect(url_for('login'))
 
     return render_template('register.html')
+
 
 # @app.route('/add_member', methods=['GET', 'POST'])
 # @admin_required
