@@ -16,9 +16,6 @@
         {% for book in books %}
         <div class="col">
             <div class="card h-100">
-                <img src="{{ url_for('static', filename='covers/' + book.Book_ID|string + '.jpg') }}" 
-                     class="card-img-top" alt="{{ book.Book_Name }}"
-                     onerror="this.src='{{ url_for('static', filename='images/default_cover.jpg') }}'">
                 <div class="card-body">
                     <h5 class="card-title">{{ book.Book_Name }}</h5>
                     <p class="card-text text-muted">{{ book.Book_Author }}</p>
