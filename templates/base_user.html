@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IITGN Library - {% block title %}User Panel{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/a2e0e6f91e.js" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #3498db;
+            --light-color: #ecf0f1;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            display: flex;
+            position: relative;
+            color: #333;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("{{ url_for('static', filename='images/library_background.png') }}");
+            background-size: cover;
+            background-position: center;
+            filter: brightness(50%);
+            z-index: -2;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+        }
+
+        .sidebar {
+            width: 250px; /* Slightly reduced width */
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 12px rgba(0, 0, 0, 0.5);
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 10px 0;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 15px;
+        }
+
+        .sidebar-header img {
+            max-height: 35px;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-header h3 {
+            font-size: 1.25rem;
+            margin: 0;
+        }
+
+        .sidebar-header span {
+            font-size: 0.8rem;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding-bottom: 15px;
+        }
+
+        .sidebar a {
+            color: white;
+            text-decoration: none;
+            margin: 5px 0;
+            font-size: 0.9rem;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+        }
+
+        .sidebar a i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .sidebar a:hover {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .sidebar .active {
+            background-color: rgba(255, 255, 255, 0.25);
+            font-weight: 500;
+        }
+
+        .sidebar-footer {
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .sidebar-footer small {
+            font-size: 0.75rem;
+        }
+
+        .content {
+            flex-grow: 1;
+            padding: 30px;
+            color: #fff;
+            margin-left: 250px;
+            width: calc(100% - 250px);
+            min-height: 100vh;
+        }
+
+        /* Simple scrollbar styling */
+        .sidebar::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay"></div>
+
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <img src="{{ url_for('static', filename='images/iitgn_logo.png') }}" alt="IITGN Logo">
+            <h3>IITGN Library <span>User Panel</span></h3>
+        </div>
+        
+        <div class="sidebar-content">
+            <a href="{{ url_for('user_dashboard') }}" class="{{ 'active' if active_page == 'dashboard' }}">
+                <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="{{ url_for('user_books') }}" class="{{ 'active' if active_page == 'books' }}">
+                <i class="fas fa-book-open"></i> Available Books
+            </a>
+            <a href="{{ url_for('user_digital') }}" class="{{ 'active' if active_page == 'digital' }}">
+                <i class="fas fa-tablet-alt"></i> Digital Books
+            </a>
+            <a href="{{ url_for('user_issued') }}" class="{{ 'active' if active_page == 'issued' }}">
+                <i class="fas fa-book-reader"></i> My Issued Books
+            </a>
+            <a href="{{ url_for('user_history') }}" class="{{ 'active' if active_page == 'history' }}">
+                <i class="fas fa-history"></i> Reading History
+            </a>
+            <a href="{{ url_for('user_fines') }}" class="{{ 'active' if active_page == 'fines' }}">
+                <i class="fas fa-rupee-sign"></i> My Fines
+            </a>
+            <a href="{{ url_for('user_notifications') }}" class="{{ 'active' if active_page == 'notifications' }}">
+                <i class="fas fa-bell"></i> Notifications
+            </a>
+            <a href="{{ url_for('user_notifications') }}" class="{{ 'active' if active_page == 'notifications' }}">
+                <i class="fas fa-bell"></i> Member Portfolio
+            </a>
+        </div>
+        
+        <div class="sidebar-footer">
+            <a href="{{ url_for('logout') }}">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+            <small>© 2025 IIT Gandhinagar Library</small>
+        </div>
+    </div>
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

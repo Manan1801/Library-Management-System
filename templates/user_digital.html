@@ -1,0 +1,38 @@
+{% extends "base_user.html" %}
+
+{% block title %}Digital Books{% endblock %}
+
+{% block content %}
+<div class="digital-books">
+    <h1 class="mb-4">Digital Books</h1>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Downloads</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ebook in ebooks %}
+                <tr>
+                    <td>{{ ebook.Digital_Name }}</td>
+                    <td>{{ ebook.DigitalID_Book_Author }}</td>
+                    <td>{{ ebook.Digital_Downloads }}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm">Download</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center">No digital books available</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
