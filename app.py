@@ -2,10 +2,21 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask import  request, jsonify
 import mysql.connector
 from flask_login import current_user
+import datetime
 
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
 from session_utils import log_unauthorized_access
+
+import random
+import string
+
+def generate_unique_password(length=10):
+    """
+    Generates a random alphanumeric password of given length.
+    """
+    characters = string.ascii_letters + string.digits
+    return ''.join(random.choices(characters, k=length))
 
 app = Flask(__name__)
 app.secret_key = 'lms2025' 
@@ -15,10 +26,25 @@ db_config = {
     'user': 'cs432g8', 
     'password': 'X7mLpNZq', 
     'database': 'cs432g8' 
-}    
+}
+
+db_config_cims = {
+    'host' : '10.0.116.125',
+    'user' :    'cs432cims',
+    'password' : 'X7mLpNZq',
+    'database' : 'cs432cims'
+}
+
+def get_cims_connection():
+    return mysql.connector.connect(**db_config_cims)
   
 def get_db_connection():
     return mysql.connector.connect(**db_config) 
+
+
+from werkzeug.security import generate_password_hash
+from flask import jsonify
+
  
 @app.route('/')  
 def home():  
@@ -70,6 +96,66 @@ def login_required(f):
 
         return f(*args, **kwargs)
     return decorated_function
+
+# task 7
+
+def log_change(operation_type, table_name, changes):
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with open("change_log.txt", "a") as log_file:
+        log_file.write(f"[{timestamp}] {operation_type} on {table_name}\n")
+        for key, value in changes.items():
+            log_file.write(f"    {key}: {value}\n")
+        log_file.write("\n")
+
+def execute_and_log_query(query, params=None, table_name=None, operation_type=None):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    # Fetch pre-change data
+    pre_state = {}
+    if operation_type in ['UPDATE', 'DELETE'] and 'WHERE' in query:
+        where_clause = query.split('WHERE')[1]
+        cursor.execute(f"SELECT * FROM {table_name} WHERE {where_clause}", params)
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            pre_state = dict(zip(columns, result))
+
+    # Execute query
+    cursor.execute(query, params or ())
+
+    # Fetch post-change data
+    post_state = {}
+    if operation_type == 'INSERT':
+        cursor.execute(f"SELECT * FROM {table_name} ORDER BY id DESC LIMIT 1")
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            post_state = dict(zip(columns, result))
+    elif operation_type == 'UPDATE' and 'WHERE' in query:
+        where_clause = query.split('WHERE')[1]
+        cursor.execute(f"SELECT * FROM {table_name} WHERE {where_clause}", params)
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            post_state = dict(zip(columns, result))
+
+    # Detect and log changes
+    changes = {}
+    if operation_type == 'INSERT':
+        changes = post_state
+    elif operation_type == 'UPDATE':
+        for key in post_state:
+            if post_state[key] != pre_state.get(key):
+                changes[key] = {'old': pre_state.get(key), 'new': post_state[key]}
+    elif operation_type == 'DELETE':
+        changes = pre_state
+
+    log_change(operation_type, table_name, changes)
+
+    connection.commit()
+    cursor.close()
+    connection.close()
 
 @app.route('/user_dashboard')
 @login_required
@@ -657,17 +743,20 @@ def register():
 
         if existing_user:
             flash('Username already exists. Please choose a different one.')
+            cursor.close()
+            conn.close()
             return redirect(url_for('register'))
 
-        # Insert new user
-        cursor.execute(
-            'INSERT INTO login (username, password, role) VALUES (%s, %s, %s)',
-            (username, hashed_password, 'user')
-        )
+        cursor.execute('INSERT INTO login (username, password, role) VALUES (%s, %s, %s)',(username, hashed_password, 'user'))
         conn.commit()
 
         cursor.close()
         conn.close()
+
+        # Use execute_and_log_query to log the INSERT
+        query = 'INSERT INTO login (username, password) VALUES (%s, %s)'
+        params = (username, hashed_password)
+        execute_and_log_query(query, params, table_name="login", operation_type="INSERT")
 
         flash('Registration successful. Please log in.')
         return redirect(url_for('login'))
@@ -718,6 +807,54 @@ def add_member():
         return render_template('add_member.html', message=message)
 
     return render_template('add_member.html')
+
+
+@app.route('/add_member_cims', methods=['GET', 'POST'])
+@admin_required
+def add_member_cims():
+    if request.method == 'POST':
+        username = request.form['username']
+        email = request.form['email']
+        dob = request.form['dob']
+
+        try:
+            # Generate a unique password
+            raw_password = generate_unique_password()
+            hashed_password = generate_password_hash(raw_password)
+
+            # Insert into CIMS database
+            cims_conn = get_cims_connection()
+            cims_cursor = cims_conn.cursor()
+
+            cims_cursor.execute("""
+                INSERT INTO members (username, email, dob)
+                VALUES (%s, %s, %s)
+            """, (username, email, dob))
+            cims_conn.commit()
+
+            # Insert into local login table
+            local_conn = get_db_connection()
+            local_cursor = local_conn.cursor()
+
+            local_cursor.execute("""
+                INSERT INTO login (username, password, role)
+                VALUES (%s, %s, %s)
+            """, (email, hashed_password, 'user'))
+
+            local_conn.commit()
+
+            cims_cursor.close()
+            cims_conn.close()
+            local_cursor.close()
+            local_conn.close()
+
+            flash(f'Member added successfully! Credentials -> Username: {email}, Password: {raw_password}', 'success')
+            return redirect(url_for('dashboard'))
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    return render_template('add_member_cims.html')
 
 
 @app.route('/logout')
@@ -792,26 +929,26 @@ def isValidSession(session_id):
     # print(result)
     return result is not None
 
-@app.route('/login', methods=['POST'])
-def login_user():
+@app.route('/api/login', methods=['POST'])
+def api_login():
     data = request.get_json()
     username = data['username']
     password = data['password']
 
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM login WHERE username = ? AND password = ?", (username, password))
+    cursor.execute("SELECT * FROM login WHERE username = %s", (username,))
     user = cursor.fetchone()
+    cursor.close()
+    conn.close()
 
-    if user:
+    if user and check_password_hash(user['password'], password):
         session_id = str(uuid.uuid4())
-        cursor.execute("INSERT INTO sessions (username, session_id) VALUES (?, ?)", (username, session_id))
-        conn.commit()
-        conn.close()
-        return jsonify({'session_id': session_id}), 200
+        session['username'] = username
+        session['token'] = session_id
+        return jsonify({'status': 'success', 'token': session_id}), 200
     else:
-        conn.close()
-        return jsonify({'error': 'Invalid credentials'}), 401
+        return jsonify({'status': 'fail', 'message': 'Invalid credentials'}), 401
     
 
 @app.route('/books', methods=['POST'])
@@ -857,6 +994,8 @@ def ADD_book():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
 
 
 @app.route('/borrow/<int:book_id>', methods=['POST'])
