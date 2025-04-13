@@ -12,8 +12,8 @@
     <h2>Add New Member</h2>
     <form method="POST" action="{{ url_for('add_member') }}">
         <div class="form-group">
-            <label for="name">Name:</label>
-            <input type="text" name="name" required>
+            <label for="username">Name:</label>
+            <input type="text" name="username" required>
         </div>
 
         <div class="form-group">
@@ -26,31 +26,6 @@
             <input type="email" name="email" required>
         </div>
 
-        <div class="form-group">
-            <label for="contact">Contact Details:</label>
-            <input type="text" name="contact" required>
-        </div>
-
-        <div class="form-group">
-            <label for="program">Program:</label>
-            <input type="text" name="program" required>
-        </div>
-
-        <div class="form-group">
-            <label for="branch">Branch:</label>
-            <input type="text" name="branch" required>
-        </div>
-
-        <div class="form-group">
-            <label for="admission_year">Year of Admission:</label>
-            <input type="number" name="admission_year" min="1900" max="2100" required>
-        </div>
-
-        <div class="form-group">
-            <label for="graduation_year">Year of Graduation:</label>
-            <input type="number" name="graduation_year" min="1900" max="2100" required>
-        </div>
-
         <input type="submit" value="Add Member">
     </form>
 
@@ -61,3 +36,4 @@
 
 </body>
 </html>
+

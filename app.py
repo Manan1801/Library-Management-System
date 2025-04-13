@@ -30,7 +30,7 @@ db_config = {
 
 db_config_cims = {
     'host' : '10.0.116.125',
-    'user' :    'cs432cims',
+    'user' :    'cs432g8',
     'password' : 'X7mLpNZq',
     'database' : 'cs432cims'
 }
@@ -627,44 +627,52 @@ def pay_fine(fine_id):
 def login():
     error = None
     if request.method == 'POST':
-        username = request.form['username']
+        email = request.form['username']
         password = request.form['password']
 
-        conn = get_db_connection()
+        conn = get_cims_connection()
         cursor = conn.cursor(dictionary=True)
         try:
-            cursor.execute("SELECT * FROM login WHERE username = %s", (username,))
+            # Step 1: Get MemberID from email
+            cursor.execute("SELECT ID FROM members WHERE emailID = %s", (email,))
+            member_row = cursor.fetchone()
+            if not member_row:
+                error = "No account found with this email."
+                return render_template('login.html', error=error)
+            
+            member_id = str(member_row['ID'])
+
+            # Step 2: Check Login table using MemberID
+            cursor.execute("SELECT * FROM Login WHERE MemberID = %s", (member_id,))
             user = cursor.fetchone()
 
-            if user and check_password_hash(user['password'], password):
+            if user and check_password_hash(user['Password'], password):
                 session_id = str(uuid.uuid4())
 
-                # Store member_id for regular users
-                if user['role'] != 'admin':
-                    cursor.execute("SELECT Member_ID FROM MEMBERS WHERE Email = %s", (username,))
-                    member = cursor.fetchone()
-                    if member:
-                        session['member_id'] = member['Member_ID']
-
-                cursor.execute(
-                    "INSERT INTO sessions (username, session_id, role) VALUES (%s, %s, %s)",
-                    (username, session_id, user['role'])
-                )
-                conn.commit()
-
-                session['username'] = user['username']
-                session['role'] = user['role']
+                session['member_id'] = member_id
+                session['username'] = email
+                session['role'] = user['Role']
                 session['session_id'] = session_id
 
+                # Optional: Store in local sessions table
+                local_conn = get_db_connection()
+                local_cursor = local_conn.cursor()
+                local_cursor.execute(
+                    "INSERT INTO sessions (username, session_id, role) VALUES (%s, %s, %s)",
+                    (email, session_id, user['Role'])
+                )
+                local_conn.commit()
+                local_cursor.close()
+                local_conn.close()
+
                 flash('Login successful!')
-                
-                # Redirect based on role
-                if user['role'] == 'admin':
+
+                if user['Role'] == 'admin':
                     return redirect(url_for('dashboard'))
                 else:
-                    return redirect(url_for('user_dashboard'))  # Correct - goes to dashboard route
+                    return redirect(url_for('user_dashboard'))
             
-            error = "Invalid username or password"
+            error = "Invalid email or password"
         except Exception as e:
             error = f"Login error: {str(e)}"
         finally:
@@ -672,6 +680,58 @@ def login():
             conn.close()
     
     return render_template('login.html', error=error)
+
+
+# from werkzeug.security import generate_password_hash
+# import uuid
+# import time
+
+# @app.route('/add_admin')
+# def add_admin():
+#     try:
+#         username = "mahi"  # Replace with your name
+#         email = "msd7@gmail.com"  # Replace with your desired email
+#         dob = "1983-07-07"  # Replace if needed
+#         raw_password = "12345"  # Replace or generate dynamically
+#         hashed_password = generate_password_hash(raw_password)
+#         session_token = None
+#         expiry = 0  # Default expiry time; can update on login
+#         role = "admin"
+
+#         # Connect to CIMS database
+#         cims_conn = get_cims_connection()
+#         cims_cursor = cims_conn.cursor()
+
+#         # Step 1: Insert into members table
+#         cims_cursor.execute("""
+#             INSERT INTO members (UserName, emailID, DoB)
+#             VALUES (%s, %s, %s)
+#         """, (username, email, dob))
+#         cims_conn.commit()
+
+#         # Step 2: Fetch newly created MemberID (ID column)
+#         cims_cursor.execute("SELECT ID FROM members WHERE emailID = %s", (email,))
+#         result = cims_cursor.fetchone()
+#         if not result:
+#             return "❌ Member insertion failed."
+#         member_id = str(result[0])  # Convert to string to match Login table MemberID type
+
+#         # Step 3: Insert into Login table
+#         cims_cursor.execute("""
+#             INSERT INTO Login (MemberID, Password, Session, Expiry, Role)
+#             VALUES (%s, %s, %s, %s, %s)
+#         """, (member_id, hashed_password, session_token, expiry, role))
+#         cims_conn.commit()
+
+#         cims_cursor.close()
+#         cims_conn.close()
+
+#         return f"✅ Admin created! Login with:\nEmail: {email}\nPassword: {raw_password}"
+
+#     except Exception as e:
+#         return f"❌ Error: {str(e)}"
+
+
 
 from functools import wraps   
 from flask import redirect, url_for, flash  
@@ -760,55 +820,55 @@ def register():
 
     return render_template('register.html')
 
+# @app.route('/add_member', methods=['GET', 'POST'])
+# @admin_required
+# def add_member():
+#     if request.method == 'POST':
+#         name = request.form['name']
+#         dob = request.form['dob']
+#         email = request.form['email']
+#         contact = request.form['contact']
+#         program = request.form['program']
+#         branch = request.form['branch']
+#         admission_year = request.form['admission_year']
+#         graduation_year = request.form['graduation_year']
+
+#         conn = get_db_connection()
+#         cursor = conn.cursor()
+
+#         # Insert into member table
+#         insert_member = """
+#             INSERT INTO MEMBERS 
+#             (Name, Date_of_Birth, Email, Contact_Details, Program, Branch, Year_of_Admission, Year_of_Graduation) 
+#             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+#         """
+#         cursor.execute(insert_member, (name, dob, email, contact, program, branch, admission_year, graduation_year))
+#         conn.commit()
+
+#         # Get the newly inserted Member_ID (assuming it's auto-incremented)
+
+#         # Create login credentials
+#         username = email  # or f"member{member_id}" or just use the name
+#         raw_password = "welcome123"
+#         hashed_password = generate_password_hash(raw_password)
+
+#         # Insert into login table
+#         insert_login = "INSERT INTO login (username, password) VALUES (%s, %s)"
+#         cursor.execute(insert_login, (username, hashed_password))
+#         conn.commit()
+
+#         cursor.close()
+#         conn.close()
+
+#         message = f"Member added successfully! Login credentials: Username = {username}, Password = {raw_password}"
+#         return render_template('add_member.html', message=message)
+
+#     return render_template('add_member.html')
+
+
 @app.route('/add_member', methods=['GET', 'POST'])
 @admin_required
 def add_member():
-    if request.method == 'POST':
-        name = request.form['name']
-        dob = request.form['dob']
-        email = request.form['email']
-        contact = request.form['contact']
-        program = request.form['program']
-        branch = request.form['branch']
-        admission_year = request.form['admission_year']
-        graduation_year = request.form['graduation_year']
-
-        conn = get_db_connection()
-        cursor = conn.cursor()
-
-        # Insert into member table
-        insert_member = """
-            INSERT INTO MEMBERS 
-            (Name, Date_of_Birth, Email, Contact_Details, Program, Branch, Year_of_Admission, Year_of_Graduation) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        cursor.execute(insert_member, (name, dob, email, contact, program, branch, admission_year, graduation_year))
-        conn.commit()
-
-        # Get the newly inserted Member_ID (assuming it's auto-incremented)
-
-        # Create login credentials
-        username = email  # or f"member{member_id}" or just use the name
-        raw_password = "welcome123"
-        hashed_password = generate_password_hash(raw_password)
-
-        # Insert into login table
-        insert_login = "INSERT INTO login (username, password) VALUES (%s, %s)"
-        cursor.execute(insert_login, (username, hashed_password))
-        conn.commit()
-
-        cursor.close()
-        conn.close()
-
-        message = f"Member added successfully! Login credentials: Username = {username}, Password = {raw_password}"
-        return render_template('add_member.html', message=message)
-
-    return render_template('add_member.html')
-
-
-@app.route('/add_member_cims', methods=['GET', 'POST'])
-@admin_required
-def add_member_cims():
     if request.method == 'POST':
         username = request.form['username']
         email = request.form['email']
@@ -817,41 +877,41 @@ def add_member_cims():
         try:
             # Generate a unique password
             raw_password = generate_unique_password()
-            hashed_password = generate_password_hash(raw_password)
 
-            # Insert into CIMS database
+            # Connect to CIMS DB
             cims_conn = get_cims_connection()
             cims_cursor = cims_conn.cursor()
 
+            # Insert member into the members table
             cims_cursor.execute("""
-                INSERT INTO members (username, email, dob)
+                INSERT INTO members (UserName, emailID, DoB)
                 VALUES (%s, %s, %s)
             """, (username, email, dob))
             cims_conn.commit()
 
-            # Insert into local login table
-            local_conn = get_db_connection()
-            local_cursor = local_conn.cursor()
+            # Get the newly created MemberID
+            cims_cursor.execute("SELECT LAST_INSERT_ID()")
+            member_id = cims_cursor.fetchone()[0]
 
-            local_cursor.execute("""
-                INSERT INTO login (username, password, role)
-                VALUES (%s, %s, %s)
-            """, (email, hashed_password, 'user'))
+            # Insert into the centralized CIMS Login table
+            cims_cursor.execute("""
+                INSERT INTO Login (MemberID, password, Session, Expiry, Role)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (member_id, raw_password, None, None, 'user'))
 
-            local_conn.commit()
+            cims_conn.commit()
 
+            # Close the connection
             cims_cursor.close()
             cims_conn.close()
-            local_cursor.close()
-            local_conn.close()
 
-            flash(f'Member added successfully! Credentials -> Username: {email}, Password: {raw_password}', 'success')
+            flash(f'Member added successfully! Credentials -> MemberID: {member_id}, Password: {raw_password}', 'success')
             return redirect(url_for('dashboard'))
 
         except Exception as e:
             return jsonify({'error': str(e)}), 500
 
-    return render_template('add_member_cims.html')
+    return render_template('add_member.html')
 
 
 @app.route('/logout')
@@ -890,24 +950,39 @@ def auth_user():
 @admin_required
 def delete_member():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username']  # This is actually the email (based on form)
 
-        conn = get_db_connection()
-        cursor = conn.cursor()
+        try:
+            cims_conn = get_cims_connection()
+            cims_cursor = cims_conn.cursor()
 
-        # First delete from login table
-        cursor.execute("DELETE FROM login WHERE username = %s", (username,))
+            # Get the MemberID from email (username)
+            cims_cursor.execute("SELECT MemberID FROM members WHERE emailID = %s", (username,))
+            result = cims_cursor.fetchone()
 
-        # Then delete from members table
-        cursor.execute("DELETE FROM MEMBERS WHERE Email = %s", (username,))
+            if result is None:
+                flash("No member found with that email.")
+                return render_template('delete_member.html')
 
-        conn.commit()
-        cursor.close()
-        conn.close()
+            member_id = result[0]
 
-        flash('Member deleted successfully!')
+            # Delete from Login table using MemberID
+            cims_cursor.execute("DELETE FROM Login WHERE MemberID = %s", (member_id,))
+
+            # Delete from Members table using email
+            cims_cursor.execute("DELETE FROM members WHERE emailID = %s", (username,))
+
+            cims_conn.commit()
+            cims_cursor.close()
+            cims_conn.close()
+
+            flash('Member deleted successfully!')
+
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     return render_template('delete_member.html')
+
 
   
 @app.route('/data')
