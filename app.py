@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask import  request, jsonify
 import mysql.connector
 from flask_login import current_user
+import datetime
 
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
@@ -70,6 +71,66 @@ def login_required(f):
 
         return f(*args, **kwargs)
     return decorated_function
+
+# task 7
+
+def log_change(operation_type, table_name, changes):
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with open("change_log.txt", "a") as log_file:
+        log_file.write(f"[{timestamp}] {operation_type} on {table_name}\n")
+        for key, value in changes.items():
+            log_file.write(f"    {key}: {value}\n")
+        log_file.write("\n")
+
+def execute_and_log_query(query, params=None, table_name=None, operation_type=None):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    # Fetch pre-change data
+    pre_state = {}
+    if operation_type in ['UPDATE', 'DELETE'] and 'WHERE' in query:
+        where_clause = query.split('WHERE')[1]
+        cursor.execute(f"SELECT * FROM {table_name} WHERE {where_clause}", params)
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            pre_state = dict(zip(columns, result))
+
+    # Execute query
+    cursor.execute(query, params or ())
+
+    # Fetch post-change data
+    post_state = {}
+    if operation_type == 'INSERT':
+        cursor.execute(f"SELECT * FROM {table_name} ORDER BY id DESC LIMIT 1")
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            post_state = dict(zip(columns, result))
+    elif operation_type == 'UPDATE' and 'WHERE' in query:
+        where_clause = query.split('WHERE')[1]
+        cursor.execute(f"SELECT * FROM {table_name} WHERE {where_clause}", params)
+        result = cursor.fetchone()
+        if result:
+            columns = [desc[0] for desc in cursor.description]
+            post_state = dict(zip(columns, result))
+
+    # Detect and log changes
+    changes = {}
+    if operation_type == 'INSERT':
+        changes = post_state
+    elif operation_type == 'UPDATE':
+        for key in post_state:
+            if post_state[key] != pre_state.get(key):
+                changes[key] = {'old': pre_state.get(key), 'new': post_state[key]}
+    elif operation_type == 'DELETE':
+        changes = pre_state
+
+    log_change(operation_type, table_name, changes)
+
+    connection.commit()
+    cursor.close()
+    connection.close()
 
 @app.route('/user_dashboard')
 @login_required
@@ -657,14 +718,17 @@ def register():
 
         if existing_user:
             flash('Username already exists. Please choose a different one.')
+            cursor.close()
+            conn.close()
             return redirect(url_for('register'))
-
-        # Insert new user
-        cursor.execute('INSERT INTO login (username, password) VALUES (%s, %s)', (username, hashed_password))
-        conn.commit()
 
         cursor.close()
         conn.close()
+
+        # Use execute_and_log_query to log the INSERT
+        query = 'INSERT INTO login (username, password) VALUES (%s, %s)'
+        params = (username, hashed_password)
+        execute_and_log_query(query, params, table_name="login", operation_type="INSERT")
 
         flash('Registration successful. Please log in.')
         return redirect(url_for('login'))
