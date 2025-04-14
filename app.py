@@ -138,7 +138,7 @@ def login_required(f):
 		return f(*args, **kwargs)
 	return decorated_function
 
-# task 7
+# task 6
 
 def log_change(operation_type, table_name, changes):
 	timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -896,10 +896,10 @@ def register():
 		dob = request.form['dob']              # Date of birth
 		password = request.form['password']
 
-		hashed_password = generate_password_hash(password)
-
-		conn = get_cims_connection()
-		cursor = conn.cursor(dictionary=True)
+        hashed_password = generate_password_hash(password)
+        group_id = 8
+        conn = get_cims_connection()
+        cursor = conn.cursor(dictionary=True)
 
 		try:
 			# Check if email already exists in members table
@@ -922,15 +922,20 @@ def register():
 			member = cursor.fetchone()
 			member_id = member['ID']
 
-			# Insert into Login table using member_id
-			cursor.execute(
-				"INSERT INTO Login (MemberID, Password, Role) VALUES (%s, %s, %s)",
-				(member_id, hashed_password, 'user')
-			)
-			conn.commit()
+            # Insert into Login table
+            cursor.execute(
+                "INSERT INTO Login (MemberID, Password, Role) VALUES (%s, %s, %s)",
+                (member_id, hashed_password, 'user')
+            )
 
-			flash('Registration successful. Please log in.')
-			return redirect(url_for('login'))
+            # 🔁 Insert into GroupMembers table
+            cursor.execute(
+                "INSERT INTO MemberGroupMapping (MemberID, GroupID) VALUES (%s, %s)",
+                (member_id, group_id)
+            )
+            conn.commit()
+            flash('Registration successful. Please log in.')
+            return redirect(url_for('login'))
 
 		except Exception as e:
 			conn.rollback()
@@ -940,7 +945,6 @@ def register():
 			conn.close()
 
 	return render_template('register.html')
-
 
 # @app.route('/add_member', methods=['GET', 'POST'])
 # @admin_required
@@ -1060,6 +1064,44 @@ def logout():
 	session.clear()
 	return redirect(url_for('login'))
 
+
+# @app.route('/portfolio')
+# def portfolio():
+#     # If user is already logged in, member_id should be in session
+#     member_id = session['member_id']  # Assume it's guaranteed to exist
+
+#     try:
+#         conn = get_cims_connection()
+#         cursor = conn.cursor(dictionary=True)
+
+#         # Check if the user is in GroupID 8
+#         cursor.execute("""
+#             SELECT * FROM GroupMembers WHERE MemberID = %s AND GroupID = %s
+#         """, (member_id, 8))
+#         is_in_group = cursor.fetchone()
+
+#         if not is_in_group:
+#             flash("You are not authorized to view this group.")
+#             return redirect(url_for('dashboard'))
+
+#         # Fetch all group 8 members
+#         cursor.execute("""
+#             SELECT m.ID, m.UserName, m.emailID, m.DoB
+#             FROM members m
+#             JOIN GroupMembers gm ON m.ID = gm.MemberID
+#             WHERE gm.GroupID = %s
+#         """, (8,))
+#         group_members = cursor.fetchall()
+
+#         return render_template('portfolio.html', members=group_members)
+
+#     except Exception as e:
+#         flash(f"Error fetching portfolio: {str(e)}")
+#         return redirect(url_for('dashboard'))
+
+#     finally:
+#         cursor.close()
+#         conn.close()
 
 
 @app.route('/authUser', methods=['POST'])
