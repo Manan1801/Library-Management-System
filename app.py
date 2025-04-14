@@ -124,9 +124,9 @@ def login_required(f):
 			flash("Please log in.")
 			return redirect(url_for('login'))
 
-		conn = get_db_connection()
+		conn = get_cims_connection()
 		cursor = conn.cursor(dictionary=True)
-		cursor.execute("SELECT * FROM sessions WHERE username = %s AND session_id = %s", (username, session_id))
+		cursor.execute("SELECT * FROM Login WHERE Session = %s", ( session_id,))
 		user_session = cursor.fetchone()
 		cursor.close()
 		conn.close()
@@ -207,16 +207,12 @@ def user_dashboard():
 	conn = get_db_connection()
 	cursor = conn.cursor(dictionary=True)
 	try:
-		# Get member ID if not already in session
-		if 'member_id' not in session:
-			cursor.execute("SELECT Member_ID FROM MEMBERS WHERE Email = %s", (session['username'],))
-			member = cursor.fetchone()
-			if member:
-				session['member_id'] = member['Member_ID']
-
+		# Get member ID if already in session
 		member_id = session.get('member_id')
+		print(f"Member ID from session: {member_id}")  # Debugging line
 		if not member_id:
 			flash("Member information not found", "danger")
+			print("Member information not found in session")
 			return redirect(url_for('logout'))
 
 		# Get counts for dashboard cards
@@ -264,6 +260,7 @@ def user_dashboard():
 		)
 	except Exception as e:
 		flash(f"Error loading dashboard: {str(e)}", "danger")
+		print(f"Error loading dashboard: {str(e)}")
 		return redirect(url_for('logout'))
 	finally:
 		cursor.close()
@@ -769,6 +766,7 @@ def login():
 					print("Admin access granted, now going to dashboard")
 					return redirect(url_for('dashboard'))
 				else:
+					print("User access granted, now going to user dashboard")
 					return redirect(url_for('user_dashboard'))
 
 			error = "Invalid email or password"
@@ -1012,6 +1010,11 @@ def add_member():
 		try:
 			# Generate a unique password
 			raw_password = generate_unique_password()
+			with open('output.txt', 'w') as file:
+	    			file.write(f"{raw_password}, {email}")
+			# Hash the password
+
+			hashed_password= generate_password_hash(raw_password)
 
 			# Connect to CIMS DB
 			cims_conn = get_cims_connection()
@@ -1032,7 +1035,7 @@ def add_member():
 			cims_cursor.execute("""
 				INSERT INTO Login (MemberID, password, Session, Expiry, Role)
 				VALUES (%s, %s, %s, %s, %s)
-			""", (member_id, raw_password, None, None, 'user'))
+			""", (member_id, hashed_password, None, None, 'user'))
 
 			cims_conn.commit()
 
@@ -1063,6 +1066,8 @@ def logout():
 				(session_id,)
 			)
 			cims_conn.commit()
+			session.pop('session_id', None)  # Remove session ID from Flask session
+			
 		except Exception as e:
 			print("Logout DB error:", e)
 		finally:
