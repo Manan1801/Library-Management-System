@@ -917,8 +917,6 @@ def register():
 
 
 
-
-
 @app.route('/dashboard') 
 def dashboard(): 
 	if 'username' in session:
@@ -1238,7 +1236,6 @@ def add_book():
 	session_id = request.headers.get('Session-ID')
 	data = request.get_json()
 	print("Adding book with data:", data)
-	print(type(data))
 	print("Session ID:", session_id)
 	print(is_admin(session_id))
 
@@ -1249,27 +1246,40 @@ def add_book():
 	try:
 		conn = get_db_connection()
 		cursor = conn.cursor()
-		print("going to add the book have all permissions now")
+		print("Permission granted. Proceeding to add book...")
+
+		# Step 1: Insert into BOOKS_DETAILS
 		cursor.execute("""
 			INSERT INTO BOOKS_DETAILS (Book_Name, Book_Author, Book_Publication_Year, Total_Reviews, Quantity, BOOK_GENRE)
 			VALUES (%s, %s, %s, %s, %s, %s)
 		""", (
 			data['Book_Name'],
 			data['Book_Author'],
-			data.get('Book_Publication_Year',"XXXX"),
+			data.get('Book_Publication_Year', "XXXX"),
 			data.get('Total_Reviews', 0),
 			data['Quantity'],
 			data['BOOK_GENRE']
 		))
+
+		# Step 2: Get the inserted Book_ID
+		BookID= cursor.lastrowid
+		Quantity_Remaining = data['Quantity']
+		Availability = 'Available' if Quantity_Remaining > 0 else 'Not Available'
+
+		# Step 3: Insert into BOOK_AVAILABILITY
+		cursor.execute("""
+			INSERT INTO BOOK_AVAILABILITY (BookID, Quantity_Remaining, Availability)
+			VALUES (%s, %s, %s)
+		""", (BookID, Quantity_Remaining, Availability))
+
 		conn.commit()
-		return jsonify({'message': 'Book added successfully'}), 201
+		return jsonify({'message': 'Book and availability added successfully'}), 201
 
 	except Exception as e:
 		return jsonify({'error': str(e)}), 500
 
 	finally:
-		conn.close() 
-
+		conn.close()
 
 
 @app.route('/borrow/<int:book_id>', methods=['POST'])
