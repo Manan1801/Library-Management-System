@@ -12,21 +12,33 @@
             background-repeat: no-repeat;
             height: 100vh;
             margin: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: #fff;
+            position: relative;
+        }
+
+        .backdrop {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6); /* darkened background for better contrast */
+            z-index: 1;
         }
 
         .overlay {
-            background-color: rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 2;
+            background-color: rgba(0, 0, 0, 0.75); /* slightly more opaque */
             padding: 50px;
             border-radius: 20px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
             max-width: 400px;
             width: 100%;
             text-align: center;
+            margin: auto;
+            top: 50%;
+            transform: translateY(-50%);
         }
 
         .overlay h2 {
@@ -37,16 +49,24 @@
         }
 
         .form-control {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: rgba(255, 255, 255, 0.85);  /* More solid white background */
             border: none;
             border-radius: 10px;
-            color: #fff;
+            color: #000;  /* Dark text so it's visible */
+            font-weight: 500;
+            padding: 10px 15px;
+        }
+
+        .form-control::placeholder {
+            color: #555;  /* Slightly darker placeholder */
         }
 
         .form-control:focus {
-            box-shadow: none;
-            background-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 5px rgba(0,123,255,0.6);
+            background-color: rgba(255, 255, 255, 1);  /* Fully white on focus */
+            color: #000;
         }
+
 
         .btn-custom {
             background-color: #007BFF;
@@ -75,21 +95,6 @@
             background-color: #5a6268;
         }
 
-        .moving-text {
-            position: absolute;
-            top: 10px;
-            width: 100%;
-            text-align: center;
-            font-size: 1.2rem;
-            color: #f0f0f0;
-            animation: moveText 10s linear infinite;
-        }
-
-        @keyframes moveText {
-            0%   {transform: translateX(100%);}
-            100% {transform: translateX(-100%);}
-        }
-
         .iitgn-logo {
             width: 220px;
             margin-bottom: 20px;
@@ -97,7 +102,8 @@
     </style>
 </head>
 <body>
-    <!-- <div class="moving-text">Welcome to the IITGN Library Login Portal — Access for Admins and Users</div> -->
+    <div class="backdrop"></div>
+
     <div class="overlay">
         <img src="{{ url_for('static', filename='images/iitgn_logo.png') }}" alt="IITGN Logo" class="iitgn-logo">
         <h2>Login to IITGN Library</h2>

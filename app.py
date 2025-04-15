@@ -6,13 +6,14 @@ import datetime
 
 from werkzeug.security import generate_password_hash, check_password_hash
 import uuid
-from session_utils import log_unauthorized_access
+from session_utils import log_unauthorized_access,write_log_to_file
 
 import random
 import string
 
 from dotenv import load_dotenv
 import os
+
 load_dotenv()
 def generate_unique_password(length=10):
 	"""
@@ -22,20 +23,20 @@ def generate_unique_password(length=10):
 	return ''.join(random.choices(characters, k=length))
 
 app = Flask(__name__)
-app.secret_key = 'lms2025' 
+app.secret_key = os.getenv('secret') 
 
 db_config = {
-    'host': os.getenv('DB_HOST'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'database': os.getenv('DB_NAME')
+	'host': os.getenv('DB_HOST'),
+	'user': os.getenv('DB_USER'),
+	'password': os.getenv('DB_PASSWORD'),
+	'database': os.getenv('DB_NAME')
 }
 
 db_config_cims = {
-    'host': os.getenv('DB_HOST'),
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'database': "cs432cims"
+	'host': os.getenv('DB_HOST'),
+	'user': os.getenv('DB_USER'),
+	'password': os.getenv('DB_PASSWORD'),
+	'database': "cs432cims"
 }
 
 def get_cims_connection():
@@ -204,70 +205,70 @@ def execute_and_log_query(query, params=None, table_name=None, operation_type=No
 @app.route('/user_dashboard')
 @login_required
 def user_dashboard():
-    if session.get('role') == 'admin':
-        return redirect(url_for('dashboard'))
+	if session.get('role') == 'admin':
+		return redirect(url_for('dashboard'))
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    try:
-        # Get member ID from session
-        member_id = session.get('member_id')
-        print(f"Member ID from session: {member_id}")  # Debugging line
-        if not member_id:
-            flash("Member information not found", "danger")
-            print("Member information not found in session")
-            return redirect(url_for('logout'))
+	conn = get_db_connection()
+	cursor = conn.cursor(dictionary=True)
+	try:
+		# Get member ID from session
+		member_id = session.get('member_id')
+		print(f"Member ID from session: {member_id}")  # Debugging line
+		if not member_id:
+			flash("Member information not found", "danger")
+			print("Member information not found in session")
+			return redirect(url_for('logout'))
 
-        # Get counts for dashboard cards
-        cursor.execute("""
-            SELECT COUNT(*) as count FROM TRANSACTIONS 
-            WHERE MemberID = %s AND Status = 'Issued'
-        """, (member_id,))
-        current_issues = cursor.fetchone()['count']
+		# Get counts for dashboard cards
+		cursor.execute("""
+			SELECT COUNT(*) as count FROM TRANSACTIONS 
+			WHERE MemberID = %s AND Status = 'Issued'
+		""", (member_id,))
+		current_issues = cursor.fetchone()['count']
 
-        cursor.execute("""
-            SELECT COUNT(*) as count FROM TRANSACTIONS 
-            WHERE MemberID = %s AND Status = 'Issued' AND Due_Date < CURDATE()
-        """, (member_id,))
-        overdue_count = cursor.fetchone()['count']
+		cursor.execute("""
+			SELECT COUNT(*) as count FROM TRANSACTIONS 
+			WHERE MemberID = %s AND Status = 'Issued' AND Due_Date < CURDATE()
+		""", (member_id,))
+		overdue_count = cursor.fetchone()['count']
 
-        cursor.execute("""
-            SELECT COUNT(*) as count FROM RESERVATIONS 
-            WHERE Member_ID = %s AND Status = 'Active'
-        """, (member_id,))
-        active_reservations = cursor.fetchone()['count']
+		cursor.execute("""
+			SELECT COUNT(*) as count FROM RESERVATIONS 
+			WHERE Member_ID = %s AND Status = 'Active'
+		""", (member_id,))
+		active_reservations = cursor.fetchone()['count']
 
-        cursor.execute("""
-            SELECT COALESCE(SUM(Fine_Amount), 0) as total FROM OVERDUE_FINE 
-            WHERE Member_Id = %s AND Payment_Status != 'Paid'
-        """, (member_id,))
-        total_fines = cursor.fetchone()['total']
+		cursor.execute("""
+			SELECT COALESCE(SUM(Fine_Amount), 0) as total FROM OVERDUE_FINE 
+			WHERE Member_Id = %s AND Payment_Status != 'Paid'
+		""", (member_id,))
+		total_fines = cursor.fetchone()['total']
 
-        # Get recent notifications
-        cursor.execute("""
-            SELECT * FROM NOTIFICATIONS 
-            WHERE Member_ID = %s 
-            ORDER BY Notification_Date DESC 
-            LIMIT 5
-        """, (member_id,))
-        notifications = cursor.fetchall()
+		# Get recent notifications
+		cursor.execute("""
+			SELECT * FROM NOTIFICATIONS 
+			WHERE Member_ID = %s 
+			ORDER BY Notification_Date DESC 
+			LIMIT 5
+		""", (member_id,))
+		notifications = cursor.fetchall()
 
-        return render_template(
-            'user_dashboard.html',
-            current_issues=current_issues,
-            overdue_count=overdue_count,
-            active_reservations=active_reservations,
-            total_fines=total_fines,
-            notifications=notifications,
-            active_page='dashboard'
-        )
-    except Exception as e:
-        flash(f"Error loading dashboard: {str(e)}", "danger")
-        print(f"Error loading dashboard: {str(e)}")
-        return redirect(url_for('logout'))
-    finally:
-        cursor.close()
-        conn.close()
+		return render_template(
+			'user_dashboard.html',
+			current_issues=current_issues,
+			overdue_count=overdue_count,
+			active_reservations=active_reservations,
+			total_fines=total_fines,
+			notifications=notifications,
+			active_page='dashboard'
+		)
+	except Exception as e:
+		flash(f"Error loading dashboard: {str(e)}", "danger")
+		print(f"Error loading dashboard: {str(e)}")
+		return redirect(url_for('logout'))
+	finally:
+		cursor.close()
+		conn.close()
 
 
 @app.route('/user_books')
@@ -752,7 +753,6 @@ def login():
 				connection.close()
 
 
-
 				# ✅ Step 4: Store session in local 'sessions' table (optional)
 				# local_conn = get_db_connection()
 				# local_cursor = local_conn.cursor()
@@ -783,7 +783,6 @@ def login():
 			conn.close()
 
 	return render_template('login.html', error=error)
- 
 
 
 # from werkzeug.security import generate_password_hash
@@ -836,7 +835,6 @@ def login():
 #         return f"❌ Error: {str(e)}"
 
 
-
 from functools import wraps   
 from flask import redirect, url_for, flash  
 
@@ -857,65 +855,82 @@ def admin_required(f):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'POST':
-        username = request.form['username']    # Full name
-        email = request.form['email']          # Email (used to login)
-        dob = request.form['dob']              # Date of birth
-        password = request.form['password']
+	if request.method == 'POST':
+		username = request.form['username']    # Full name
+		email = request.form['email']          # Email (used to login)
+		dob = request.form['dob']              # Date of birth
+		password = request.form['password']
 
-        hashed_password = generate_password_hash(password)
-        group_id = 8
+		hashed_password = generate_password_hash(password)
+		group_id = 8
 
-        conn = get_cims_connection()
-        cursor = conn.cursor(dictionary=True)
+		conn = get_cims_connection()
+		cursor_cims = conn.cursor(dictionary=True)
+		conn2 = get_db_connection();
+		cursor_db = conn2.cursor(dictionary=True);
+		print("Connected to the database")
 
-        try:
-            # Check if email already exists in members table
-            cursor.execute("SELECT * FROM members WHERE emailID = %s", (email,))
-            existing_member = cursor.fetchone()
+		try:
+			# Check if email already exists in members table
+			cursor_cims.execute("SELECT * FROM members WHERE emailID = %s", (email,))
+			existing_member = cursor_cims.fetchone()
 
-            if existing_member:
-                flash('User with this email already exists.')
-                return redirect(url_for('register'))
+			if existing_member:
+				flash('User with this email already exists.')
+				return redirect(url_for('register'))
 
-            # Insert into members table
-            cursor.execute(
-                "INSERT INTO members (UserName, emailID, DoB) VALUES (%s, %s, %s)",
-                (username, email, dob)
-            )
-            conn.commit()
+			# Insert into members table
+			cursor_cims.execute(
+				"INSERT INTO members (UserName, emailID, DoB) VALUES (%s, %s, %s)",
+				(username, email, dob)
+			)
 
-            # Get the newly inserted member's ID
-            cursor.execute("SELECT ID FROM members WHERE emailID = %s", (email,))
-            member = cursor.fetchone()
-            member_id = member['ID']
+			conn.commit()
 
-            # Insert into Login table
-            cursor.execute(
-                "INSERT INTO Login (MemberID, Password, Role) VALUES (%s, %s, %s)",
-                (member_id, hashed_password, 'user')
-            )
+			# Get the newly inserted member's ID
+			cursor_cims.execute("SELECT ID FROM members WHERE emailID = %s", (email,))
+			member = cursor_cims.fetchone()
+			member_id = member['ID']
 
-            # Insert into MemberGroupMapping table
-            cursor.execute(
-                "INSERT INTO MemberGroupMapping (MemberID, GroupID) VALUES (%s, %s)",
-                (member_id, group_id)
-            )
+			# Insert into Login table
+			cursor_cims.execute(
+				"INSERT INTO Login (MemberID, Password, Role) VALUES (%s, %s, %s)",
+				(member_id, hashed_password, 'user')
+			)
+			conn.commit()
 
-            conn.commit()
-            flash('Registration successful. Please log in.')
-            return redirect(url_for('login'))
 
-        except Exception as e:
-            conn.rollback()
-            flash(f"Registration failed: {str(e)}")
+			# Insert into MemberGroupMapping table
+			cursor_cims.execute(
+				"INSERT INTO MemberGroupMapping (MemberID, GroupID) VALUES (%s, %s)",
+				(member_id, group_id)
+			)
+			conn.commit()
 
-        finally:
-            cursor.close()
-            conn.close()
+			current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+			cursor_db.execute(
+	"INSERT INTO SYS_LOGS (Action, Timestamp) VALUES (%s, %s)",
+	(f"New user registered: {email}", current_time)
+)           
+			print("Log entry created in SYS_LOGS table")
+			write_log_to_file(f"New user registered: {email}", current_time)  # Log to file
+			conn2.commit()
 
-    return render_template('register.html')
+			flash('Registration successful. Please log in.')
+			return redirect(url_for('login'))
 
+		except Exception as e:
+			conn.rollback()
+			print(f"Error: {str(e)}")
+			flash(f"Registration failed: {str(e)}")
+
+		finally:
+			cursor_db.close()
+			conn2.close()
+			cursor_cims.close()
+			conn.close()
+
+	return render_template('register.html')
 
 
 
@@ -1014,11 +1029,11 @@ def add_member():
 		try:
 			# Generate a unique password
 			raw_password = generate_unique_password()
-			with open('output.txt', 'w') as file:
-	    			file.write(f"{raw_password}, {email}")
-			# Hash the password
+			with open('output.txt', 'a') as file:
+				file.write(f"{raw_password}, {email}")
 
-			hashed_password= generate_password_hash(raw_password)
+			# Hash the password
+			hashed_password = generate_password_hash(raw_password)
 
 			# Connect to CIMS DB
 			cims_conn = get_cims_connection()
@@ -1043,6 +1058,9 @@ def add_member():
 
 			cims_conn.commit()
 
+			# ✅ Write log to file
+			write_log_to_file(f"Admin added new member: {username} ({email}) with MemberID: {member_id}")
+
 			# Close the connection
 			cims_cursor.close()
 			cims_conn.close()
@@ -1051,9 +1069,11 @@ def add_member():
 			return redirect(url_for('dashboard'))
 
 		except Exception as e:
+			write_log_to_file(f"[ERROR] Failed to add member: {email} — {str(e)}")
 			return jsonify({'error': str(e)}), 500
 
 	return render_template('add_member.html')
+
 
 
 @app.route('/logout')
@@ -1070,10 +1090,16 @@ def logout():
 				(session_id,)
 			)
 			cims_conn.commit()
+
+			# Optional: Log successful logout
+			write_log_to_file(f"User logged out with session ID: {session_id}")
+
 			session.pop('session_id', None)  # Remove session ID from Flask session
 
 		except Exception as e:
+			write_log_to_file(f"[ERROR] Logout failed for session ID: {session_id} — {str(e)}")
 			print("Logout DB error:", e)
+
 		finally:
 			cims_cursor.close()
 			cims_conn.close()
@@ -1081,6 +1107,7 @@ def logout():
 	# Clear local Flask session
 	session.clear()
 	return redirect(url_for('login'))
+
 
 
 # @app.route('/portfolio')
@@ -1164,6 +1191,7 @@ def delete_member():
 
 			if result is None:
 				flash("No member found with that email.")
+				write_log_to_file(f"[WARNING] Delete failed — No member found with email: {email}")
 				return render_template('delete_member.html')
 
 			member_id = result[0]
@@ -1177,9 +1205,11 @@ def delete_member():
 			cims_conn.commit()
 
 			flash('Member deleted successfully!')
+			write_log_to_file(f"Deleted member with email: {email} and MemberID: {member_id}")
 
 		except Exception as e:
 			cims_conn.rollback()
+			write_log_to_file(f"[ERROR] Delete failed for email: {email} — {str(e)}")
 			return jsonify({'error': str(e)}), 500
 
 		finally:
@@ -1189,6 +1219,7 @@ def delete_member():
 	return render_template('delete_member.html')
 
 
+
 @app.route('/data')
 @admin_required
 def data_dashboard():
@@ -1196,26 +1227,33 @@ def data_dashboard():
 	return render_template('data_dashboard.html', tables=table_names)
 
 def isValidSession(session_id):
-    cims_conn = get_cims_connection()
-    cims_cursor = cims_conn.cursor(dictionary=True)
+	cims_conn = get_cims_connection()
+	cims_cursor = cims_conn.cursor(dictionary=True)
 
-    try:
-        cims_cursor.execute("SELECT * FROM Login WHERE Session = %s", (session_id,))
-        result = cims_cursor.fetchone()
-        
-        # Optional: Expiry check
-        if result:
-            expiry = result.get('Expiry')
-            if expiry and expiry > int(datetime.datetime.now().timestamp()):
-                return True
-    except Exception as e:
-        print("Session validation error:", e)
+	try:
+		cims_cursor.execute("SELECT * FROM Login WHERE Session = %s", (session_id,))
+		result = cims_cursor.fetchone()
 
-    finally:
-        cims_cursor.close()
-        cims_conn.close()
+		if result:
+			expiry = result.get('Expiry')
+			current_time = int(datetime.datetime.now().timestamp())
+			if expiry and expiry > current_time:
+				write_log_to_file(f"Session {session_id} is valid.")
+				return True
+			else:
+				write_log_to_file(f"Session {session_id} found but expired.")
+		else:
+			write_log_to_file(f"Session {session_id} is invalid or not found.")
 
-    return False
+	except Exception as e:
+		write_log_to_file(f"[ERROR] Session validation failed for session {session_id} — {str(e)}")
+
+	finally:
+		cims_cursor.close()
+		cims_conn.close()
+
+	return False
+
 
 
 @app.route('/api/login', methods=['POST'])
@@ -1287,92 +1325,92 @@ def add_book():
 	except Exception as e:
 		return jsonify({'error': str(e)}), 500
 
-	finally:
+	finally: 
 		conn.close()
 
 
 @app.route('/borrow/<int:book_id>', methods=['POST'])
 def borrow_book(book_id):
-    session_id = request.headers.get('Session-ID')
-    print("Session ID from header:", session_id)
+	session_id = request.headers.get('Session-ID')
+	print("Session ID from header:", session_id)
 
-    if not session_id:
-        log_unauthorized_access("POST /borrow", f"book_id={book_id} — no Session-ID")
-        return jsonify({'error': 'Unauthorized - No Session ID'}), 401
+	if not session_id:
+		log_unauthorized_access("POST /borrow", f"book_id={book_id} — no Session-ID")
+		return jsonify({'error': 'Unauthorized - No Session ID'}), 401
 
-    try:
-        conn = get_cims_connection()
-        cursor = conn.cursor(dictionary=True)
+	try:
+		conn = get_cims_connection()
+		cursor = conn.cursor(dictionary=True)
 
-        # ✅ Validate session ID from Login table
-        cursor.execute("SELECT MemberID, Expiry FROM Login WHERE Session = %s", (session_id,))
-        session_row = cursor.fetchone()
+		# ✅ Validate session ID from Login table
+		cursor.execute("SELECT MemberID, Expiry FROM Login WHERE Session = %s", (session_id,))
+		session_row = cursor.fetchone()
 
-        if not session_row:
-            log_unauthorized_access("POST /borrow", f"Invalid session ID: {session_id}")
-            return jsonify({'error': 'Unauthorized - Invalid Session'}), 401
+		if not session_row:
+			log_unauthorized_access("POST /borrow", f"Invalid session ID: {session_id}")
+			return jsonify({'error': 'Unauthorized - Invalid Session'}), 401
 
-        # ✅ Check if session has expired
-        import time
-        current_unix = int(time.time())
-        if session_row['Expiry'] < current_unix:
-            log_unauthorized_access("POST /borrow", f"Expired session ID: {session_id}")
-            return jsonify({'error': 'Session expired'}), 401
+		# ✅ Check if session has expired
+		import time
+		current_unix = int(time.time())
+		if session_row['Expiry'] < current_unix:
+			log_unauthorized_access("POST /borrow", f"Expired session ID: {session_id}")
+			return jsonify({'error': 'Session expired'}), 401
 
-        member_id = session_row['MemberID']
-        print("Authorized member ID:", member_id)
+		member_id = session_row['MemberID']
+		print("Authorized member ID:", member_id)
 
-        # Now connect to library DB and check book availability
-        lib_conn = get_db_connection()
-        lib_cursor = lib_conn.cursor(dictionary=True)
+		# Now connect to library DB and check book availability
+		lib_conn = get_db_connection()
+		lib_cursor = lib_conn.cursor(dictionary=True)
 
-        lib_cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
-        book = lib_cursor.fetchone()
+		lib_cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
+		book = lib_cursor.fetchone()
 
-        if not book:
-            return jsonify({'error': 'Book not found'}), 404
+		if not book:
+			return jsonify({'error': 'Book not found'}), 404
 
-        if book['Quantity_Remaining'] <= 0:
-            return jsonify({'error': 'Book not available'}), 400
+		if book['Quantity_Remaining'] <= 0:
+			return jsonify({'error': 'Book not available'}), 400
 
-        # Update quantity
-        new_quantity = book['Quantity_Remaining'] - 1
-        availability = 'Available' if new_quantity > 0 else 'Not Available'
+		# Update quantity
+		new_quantity = book['Quantity_Remaining'] - 1
+		availability = 'Available' if new_quantity > 0 else 'Not Available'
 
-        lib_cursor.execute("""
-            UPDATE BOOK_AVAILABILITY
-            SET Quantity_Remaining = %s, Availability = %s 
-            WHERE BookID = %s
-        """, (new_quantity, availability, book_id))
+		lib_cursor.execute("""
+			UPDATE BOOK_AVAILABILITY
+			SET Quantity_Remaining = %s, Availability = %s 
+			WHERE BookID = %s
+		""", (new_quantity, availability, book_id))
 
-        # Insert into TRANSACTIONS
-        from datetime import datetime, timedelta
-        issue_date = datetime.now().date()
-        due_date = issue_date + timedelta(days=14)
+		# Insert into TRANSACTIONS
+		from datetime import datetime, timedelta
+		issue_date = datetime.now().date()
+		due_date = issue_date + timedelta(days=14)
 
-        lib_cursor.execute("""
-            INSERT INTO TRANSACTIONS(MemberID, BookID, Issue_Date, Due_Date, Status)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (member_id, book_id, issue_date, due_date, 'Issued'))
+		lib_cursor.execute("""
+			INSERT INTO TRANSACTIONS(MemberID, BookID, Issue_Date, Due_Date, Status)
+			VALUES (%s, %s, %s, %s, %s)
+		""", (member_id, book_id, issue_date, due_date, 'Issued'))
 
-        lib_conn.commit()
+		lib_conn.commit()
 
-        # Cleanup
-        lib_cursor.close()
-        lib_conn.close()
-        cursor.close()
-        conn.close()
+		# Cleanup
+		lib_cursor.close()
+		lib_conn.close()
+		cursor.close()
+		conn.close()
 
-        return jsonify({
-            'message': 'Book issued successfully',
-            'book_id': book_id,
-            'issued_to': member_id,
-            'due_date': str(due_date)
-        }), 200
+		return jsonify({
+			'message': 'Book issued successfully',
+			'book_id': book_id,
+			'issued_to': member_id,
+			'due_date': str(due_date)
+		}), 200
 
-    except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
+	except Exception as e:
+		print(f"Error: {e}")
+		return jsonify({'error': 'Internal Server Error'}), 500
 
 
 # @app.route('/borrow/<int:book_id>', methods=['POST'])
@@ -1600,4 +1638,5 @@ def issue_book():
    
 
 if __name__ == '__main__':
-	app.run(debug=True)            
+	app.run(debug=True, port=5000)            
+	

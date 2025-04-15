@@ -1,6 +1,8 @@
-Flask
-mysql-connector-python
-flask-login
-python-dotenv
-Werkzeug
+flask==3.0.0
+mysql-connector-python==8.3.0
+Flask-Login==0.6.3
+python-dotenv==1.0.0
+Werkzeug==3.0.1
 gunicorn
+pytest==7.4.3
+pytest-cov==4.1.0
