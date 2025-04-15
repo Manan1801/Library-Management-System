@@ -11,6 +11,9 @@ from session_utils import log_unauthorized_access
 import random
 import string
 
+from dotenv import load_dotenv
+import os
+load_dotenv()
 def generate_unique_password(length=10):
 	"""
 	Generates a random alphanumeric password of given length.
@@ -22,17 +25,17 @@ app = Flask(__name__)
 app.secret_key = 'lms2025' 
 
 db_config = {
-	'host': '10.0.116.125', 
-	'user': 'cs432g8', 
-	'password': 'X7mLpNZq', 
-	'database': 'cs432g8' 
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_NAME')
 }
 
 db_config_cims = {
-	'host' : '10.0.116.125',
-	'user' :    'cs432g8',
-	'password' : 'X7mLpNZq',
-	'database' : 'cs432cims'
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': "cs432cims"
 }
 
 def get_cims_connection():
@@ -780,7 +783,7 @@ def login():
 			conn.close()
 
 	return render_template('login.html', error=error)
-
+ 
 
 
 # from werkzeug.security import generate_password_hash
@@ -1290,60 +1293,87 @@ def add_book():
 
 @app.route('/borrow/<int:book_id>', methods=['POST'])
 def borrow_book(book_id):
-	session_id = request.headers.get('Session-ID')
-	member_id = session.get('member_id')
+    session_id = request.headers.get('Session-ID')
+    print("Session ID from header:", session_id)
 
-	if not member_id:
-		log_unauthorized_access("POST /borrow", f"book_id={book_id}")
-		return jsonify({'error': 'Unauthorized'}), 401
+    if not session_id:
+        log_unauthorized_access("POST /borrow", f"book_id={book_id} — no Session-ID")
+        return jsonify({'error': 'Unauthorized - No Session ID'}), 401
 
-	try:
-		conn = get_db_connection()
-		cursor = conn.cursor(dictionary=True)
+    try:
+        conn = get_cims_connection()
+        cursor = conn.cursor(dictionary=True)
 
-		# Check book availability
-		cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
-		book = cursor.fetchone()
+        # ✅ Validate session ID from Login table
+        cursor.execute("SELECT MemberID, Expiry FROM Login WHERE Session = %s", (session_id,))
+        session_row = cursor.fetchone()
 
-		if not book:
-			return jsonify({'error': 'Book not found'}), 404
+        if not session_row:
+            log_unauthorized_access("POST /borrow", f"Invalid session ID: {session_id}")
+            return jsonify({'error': 'Unauthorized - Invalid Session'}), 401
 
-		if book['Quantity_Remaining'] <= 0:
-			return jsonify({'error': 'Book not available'}), 400
+        # ✅ Check if session has expired
+        import time
+        current_unix = int(time.time())
+        if session_row['Expiry'] < current_unix:
+            log_unauthorized_access("POST /borrow", f"Expired session ID: {session_id}")
+            return jsonify({'error': 'Session expired'}), 401
 
-		# Decrease book quantity
-		new_quantity = book['Quantity_Remaining'] - 1
-		availability = 'Available' if new_quantity > 0 else 'Not Available'
+        member_id = session_row['MemberID']
+        print("Authorized member ID:", member_id)
 
-		cursor.execute("""
-			UPDATE BOOK_AVAILABILITY
-			SET Quantity_Remaining = %s, Availability = %s 
-			WHERE BookID = %s
-		""", (new_quantity, availability, book_id))
+        # Now connect to library DB and check book availability
+        lib_conn = get_db_connection()
+        lib_cursor = lib_conn.cursor(dictionary=True)
 
-		# Insert borrow record
-		from datetime import datetime, timedelta
-		issue_date = datetime.now().date()
-		due_date = issue_date + timedelta(days=14)
+        lib_cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
+        book = lib_cursor.fetchone()
 
-		cursor.execute("""
-			INSERT INTO TRANSACTIONS(MemberID, BookID, Issue_Date, Due_Date,Status)
-			VALUES (%s, %s, %s, %s, %s)
-		""", (member_id, book_id, issue_date, due_date, 'Issued'))
+        if not book:
+            return jsonify({'error': 'Book not found'}), 404
 
-		conn.commit()
-		conn.close()
+        if book['Quantity_Remaining'] <= 0:
+            return jsonify({'error': 'Book not available'}), 400
 
-		return jsonify({
-			'message': 'Book issued successfully',
-			'book_id': book_id,
-			'issued_to': member_id,
-			'due_date': str(due_date)
-		}), 200
+        # Update quantity
+        new_quantity = book['Quantity_Remaining'] - 1
+        availability = 'Available' if new_quantity > 0 else 'Not Available'
 
-	except Exception as e:
-		print(f"Error: {e}")
-		return jsonify({'error': 'Something went wrong'}), 500
+        lib_cursor.execute("""
+            UPDATE BOOK_AVAILABILITY
+            SET Quantity_Remaining = %s, Availability = %s 
+            WHERE BookID = %s
+        """, (new_quantity, availability, book_id))
+
+        # Insert into TRANSACTIONS
+        from datetime import datetime, timedelta
+        issue_date = datetime.now().date()
+        due_date = issue_date + timedelta(days=14)
+
+        lib_cursor.execute("""
+            INSERT INTO TRANSACTIONS(MemberID, BookID, Issue_Date, Due_Date, Status)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (member_id, book_id, issue_date, due_date, 'Issued'))
+
+        lib_conn.commit()
+
+        # Cleanup
+        lib_cursor.close()
+        lib_conn.close()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'message': 'Book issued successfully',
+            'book_id': book_id,
+            'issued_to': member_id,
+            'due_date': str(due_date)
+        }), 200
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
+
 
 # @app.route('/borrow/<int:book_id>', methods=['POST'])
 # def borrow_book(book_id):
