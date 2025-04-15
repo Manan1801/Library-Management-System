@@ -201,70 +201,71 @@ def execute_and_log_query(query, params=None, table_name=None, operation_type=No
 @app.route('/user_dashboard')
 @login_required
 def user_dashboard():
-	if session.get('role') == 'admin':
-		return redirect(url_for('dashboard'))
+    if session.get('role') == 'admin':
+        return redirect(url_for('dashboard'))
 
-	conn = get_db_connection()
-	cursor = conn.cursor(dictionary=True)
-	try:
-		# Get member ID if already in session
-		member_id = session.get('member_id')
-		print(f"Member ID from session: {member_id}")  # Debugging line
-		if not member_id:
-			flash("Member information not found", "danger")
-			print("Member information not found in session")
-			return redirect(url_for('logout'))
+    conn = get_db_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        # Get member ID from session
+        member_id = session.get('member_id')
+        print(f"Member ID from session: {member_id}")  # Debugging line
+        if not member_id:
+            flash("Member information not found", "danger")
+            print("Member information not found in session")
+            return redirect(url_for('logout'))
 
-		# Get counts for dashboard cards
-		cursor.execute("""
-			SELECT COUNT(*) as count FROM TRANSACTIONS 
-			WHERE Member_ID = %s AND Status = 'Issued'
-		""", (member_id,))
-		current_issues = cursor.fetchone()['count']
+        # Get counts for dashboard cards
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM TRANSACTIONS 
+            WHERE MemberID = %s AND Status = 'Issued'
+        """, (member_id,))
+        current_issues = cursor.fetchone()['count']
 
-		cursor.execute("""
-			SELECT COUNT(*) as count FROM TRANSACTIONS 
-			WHERE Member_ID = %s AND Status = 'Issued' AND Due_Date < CURDATE()
-		""", (member_id,))
-		overdue_count = cursor.fetchone()['count']
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM TRANSACTIONS 
+            WHERE MemberID = %s AND Status = 'Issued' AND Due_Date < CURDATE()
+        """, (member_id,))
+        overdue_count = cursor.fetchone()['count']
 
-		cursor.execute("""
-			SELECT COUNT(*) as count FROM RESERVATIONS 
-			WHERE Member_ID = %s AND Status = 'Active'
-		""", (member_id,))
-		active_reservations = cursor.fetchone()['count']
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM RESERVATIONS 
+            WHERE Member_ID = %s AND Status = 'Active'
+        """, (member_id,))
+        active_reservations = cursor.fetchone()['count']
 
-		cursor.execute("""
-			SELECT COALESCE(SUM(Fine_Amount), 0) as total FROM OVERDUE_FINE 
-			WHERE Member_Id = %s AND Payment_Status != 'Paid'
-		""", (member_id,))
-		total_fines = cursor.fetchone()['total']
+        cursor.execute("""
+            SELECT COALESCE(SUM(Fine_Amount), 0) as total FROM OVERDUE_FINE 
+            WHERE Member_Id = %s AND Payment_Status != 'Paid'
+        """, (member_id,))
+        total_fines = cursor.fetchone()['total']
 
-		# Get recent notifications
-		cursor.execute("""
-			SELECT * FROM NOTIFICATIONS 
-			WHERE Member_ID = %s 
-			ORDER BY Notification_Date DESC 
-			LIMIT 5
-		""", (member_id,))
-		notifications = cursor.fetchall()
+        # Get recent notifications
+        cursor.execute("""
+            SELECT * FROM NOTIFICATIONS 
+            WHERE Member_ID = %s 
+            ORDER BY Notification_Date DESC 
+            LIMIT 5
+        """, (member_id,))
+        notifications = cursor.fetchall()
 
-		return render_template(
-			'user_dashboard.html',
-			current_issues=current_issues,
-			overdue_count=overdue_count,
-			active_reservations=active_reservations,
-			total_fines=total_fines,
-			notifications=notifications,
-			active_page='dashboard'
-		)
-	except Exception as e:
-		flash(f"Error loading dashboard: {str(e)}", "danger")
-		print(f"Error loading dashboard: {str(e)}")
-		return redirect(url_for('logout'))
-	finally:
-		cursor.close()
-		conn.close()
+        return render_template(
+            'user_dashboard.html',
+            current_issues=current_issues,
+            overdue_count=overdue_count,
+            active_reservations=active_reservations,
+            total_fines=total_fines,
+            notifications=notifications,
+            active_page='dashboard'
+        )
+    except Exception as e:
+        flash(f"Error loading dashboard: {str(e)}", "danger")
+        print(f"Error loading dashboard: {str(e)}")
+        return redirect(url_for('logout'))
+    finally:
+        cursor.close()
+        conn.close()
+
 
 @app.route('/user_books')
 @login_required
@@ -1067,7 +1068,7 @@ def logout():
 			)
 			cims_conn.commit()
 			session.pop('session_id', None)  # Remove session ID from Flask session
-			
+
 		except Exception as e:
 			print("Logout DB error:", e)
 		finally:
@@ -1290,45 +1291,102 @@ def add_book():
 @app.route('/borrow/<int:book_id>', methods=['POST'])
 def borrow_book(book_id):
 	session_id = request.headers.get('Session-ID')
+	member_id = session.get('member_id')
 
-	if not isValidSession(session_id):
+	if not member_id:
 		log_unauthorized_access("POST /borrow", f"book_id={book_id}")
 		return jsonify({'error': 'Unauthorized'}), 401
 
 	try:
 		conn = get_db_connection()
-		cursor = conn.cursor()
+		cursor = conn.cursor(dictionary=True)
 
-		# Check current quantity
+		# Check book availability
 		cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
-		result = cursor.fetchone()
+		book = cursor.fetchone()
 
-		if not result:
-			conn.close()
+		if not book:
 			return jsonify({'error': 'Book not found'}), 404
 
-		quantity = result[0]
-
-		if quantity <= 0:
-			conn.close()
+		if book['Quantity_Remaining'] <= 0:
 			return jsonify({'error': 'Book not available'}), 400
 
-		# Update quantity
-		new_quantity = quantity - 1
+		# Decrease book quantity
+		new_quantity = book['Quantity_Remaining'] - 1
 		availability = 'Available' if new_quantity > 0 else 'Not Available'
 
 		cursor.execute("""
 			UPDATE BOOK_AVAILABILITY
-			SET Quantity_Remaining = %s, Availability = %s
+			SET Quantity_Remaining = %s, Availability = %s 
 			WHERE BookID = %s
 		""", (new_quantity, availability, book_id))
+
+		# Insert borrow record
+		from datetime import datetime, timedelta
+		issue_date = datetime.now().date()
+		due_date = issue_date + timedelta(days=14)
+
+		cursor.execute("""
+			INSERT INTO TRANSACTIONS(MemberID, BookID, Issue_Date, Due_Date,Status)
+			VALUES (%s, %s, %s, %s, %s)
+		""", (member_id, book_id, issue_date, due_date, 'Issued'))
+
 		conn.commit()
 		conn.close()
 
-		return jsonify({'message': 'Book borrowed successfully'}), 200
+		return jsonify({
+			'message': 'Book issued successfully',
+			'book_id': book_id,
+			'issued_to': member_id,
+			'due_date': str(due_date)
+		}), 200
 
 	except Exception as e:
-		return jsonify({'error': str(e)}), 500
+		print(f"Error: {e}")
+		return jsonify({'error': 'Something went wrong'}), 500
+
+# @app.route('/borrow/<int:book_id>', methods=['POST'])
+# def borrow_book(book_id):
+# 	session_id = request.headers.get('Session-ID')
+
+# 	if not isValidSession(session_id):
+# 		log_unauthorized_access("POST /borrow", f"book_id={book_id}")
+# 		return jsonify({'error': 'Unauthorized'}), 401
+
+# 	try:
+# 		conn = get_db_connection()
+# 		cursor = conn.cursor()
+
+# 		# Check current quantity
+# 		cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
+# 		result = cursor.fetchone()
+
+# 		if not result:
+# 			conn.close()
+# 			return jsonify({'error': 'Book not found'}), 404
+
+# 		quantity = result[0]
+
+# 		if quantity <= 0:
+# 			conn.close()
+# 			return jsonify({'error': 'Book not available'}), 400
+
+# 		# Update quantity
+# 		new_quantity = quantity - 1
+# 		availability = 'Available' if new_quantity > 0 else 'Not Available'
+
+# 		cursor.execute("""
+# 			UPDATE BOOK_AVAILABILITY
+# 			SET Quantity_Remaining = %s, Availability = %s
+# 			WHERE BookID = %s
+# 		""", (new_quantity, availability, book_id))
+# 		conn.commit()
+# 		conn.close()
+
+# 		return jsonify({'message': 'Book borrowed successfully'}), 200
+
+# 	except Exception as e:
+# 		return jsonify({'error': str(e)}), 500
 	
 
 @app.route('/books', methods=['GET'])
