@@ -30,3 +30,13 @@
 [2025-04-16 08:28:11] Session cd71ac20-2409-4cfa-9716-9e04004561ff is valid.
 [2025-04-16 08:34:10] Admin added new member: Prajas Kulkarni (23110252@iitgn.ac.in) with MemberID: 24210278
 [2025-04-16 09:09:29] User logged out with session ID: 23ca07a6-51b4-4d29-9b0d-ed17ab0ee0e3
+[2025-04-16 09:32:17] Session 446ce282-bbdd-4fdc-96fb-ff70d2603a1f is valid.
+[2025-04-16 09:32:58] Session 446ce282-bbdd-4fdc-96fb-ff70d2603a1f is valid.
+[2025-04-16 09:36:24] Session 446ce282-bbdd-4fdc-96fb-ff70d2603a1f is valid.
+[2025-04-16 09:51:57] User logged out with session ID: cd71ac20-2409-4cfa-9716-9e04004561ff
+[2025-04-16 10:22:58] User logged out with session ID: 6b88ebc3-e3f6-4ac9-94d0-d3f30af0a290
+[2025-04-16 10:37:16] Admin added new member: Ansh Kesarwani (ansh1.kesari2005@gmail.com) with MemberID: 24210300
+[2025-04-16 10:39:45] Session cd71ac20-2409-4cfa-9716-9e04004561ff is invalid or not found.
+[2025-04-16 10:40:21] Session 74b2108c-07ec-486b-89b7-546d9e969477 is valid.
+[2025-04-16 10:40:40] User logged out with session ID: 74b2108c-07ec-486b-89b7-546d9e969477
+[2025-04-16 10:41:35] Session 9c04f7ea-1e2f-478c-8312-07c90313004d is valid.

@@ -1079,9 +1079,27 @@ def add_member():
 			# Get the newly created MemberID
 			cims_cursor.execute("SELECT LAST_INSERT_ID()")
 			member_id = cims_cursor.fetchone()[0]
+			message = f"""
+Dear User,
 
-			message = f"Dear User,\nYour details have been added to the CIMS system.\nYour login credentials are:\nUsername: {email}\nPassword: {raw_password}"
-			send_otp(email,"CIMS Login Portal Credentials",message)
+Welcome to the Centralized Information Management System (CIMS).
+
+We are pleased to inform you that your account has been successfully created. Below are your login credentials for accessing the CIMS portal:
+
+----------------------------------------
+Username : {email}
+Password : {raw_password}
+----------------------------------------
+
+For security purposes, please ensure that you change your password after logging in for the first time.
+
+If you have any questions or face any issues, feel free to contact the system administrator.
+
+Best regards,  
+Library Management Team
+"""
+			send_otp(email, "Your CIMS Portal Login Credentials", message)
+
 
 			# Insert into the centralized CIMS Login table
 			cims_cursor.execute("""
@@ -1143,43 +1161,51 @@ def logout():
 
 
 
-# @app.route('/portfolio')
-# def portfolio():
-#     # If user is already logged in, member_id should be in session
-#     member_id = session['member_id']  # Assume it's guaranteed to exist
+@app.route('/api/portfolio', methods=['GET'])
+def api_portfolio():
+	# Debugging: Check what session contains
+	print("SESSION:     ",5);session_id = request.headers.get('Session-ID')
 
-#     try:
-#         conn = get_cims_connection()
-#         cursor = conn.cursor(dictionary=True)
+	print("SESSION ID:  ",session_id)
+	conn = get_cims_connection()
+	cursor = conn.cursor(dictionary=True)
+	cursor.execute("SELECT * FROM Login WHERE Session = %s", (session_id,))
+	result = cursor.fetchone()
 
-#         # Check if the user is in GroupID 8
-#         cursor.execute("""
-#             SELECT * FROM GroupMembers WHERE MemberID = %s AND GroupID = %s
-#         """, (member_id, 8))
-#         is_in_group = cursor.fetchone()
 
-#         if not is_in_group:
-#             flash("You are not authorized to view this group.")
-#             return redirect(url_for('dashboard'))
+	member_id = result['MemberID']
+	print("Member ID:   ",member_id)
 
-#         # Fetch all group 8 members
-#         cursor.execute("""
-#             SELECT m.ID, m.UserName, m.emailID, m.DoB
-#             FROM members m
-#             JOIN GroupMembers gm ON m.ID = gm.MemberID
-#             WHERE gm.GroupID = %s
-#         """, (8,))
-#         group_members = cursor.fetchall()
+	try:
+		conn = get_cims_connection()
+		cursor = conn.cursor(dictionary=True)
 
-#         return render_template('portfolio.html', members=group_members)
+		# Step 1: Check if the user is in GroupID 8
+		cursor.execute("""
+			SELECT * FROM MemberGroupMapping WHERE MemberID = %s AND GroupID = %s
+		""", (member_id, 8))
+		is_in_group = cursor.fetchone()
 
-#     except Exception as e:
-#         flash(f"Error fetching portfolio: {str(e)}")
-#         return redirect(url_for('dashboard'))
+		if not is_in_group:
+			return jsonify({'error': 'Access Denied'}), 403
 
-#     finally:
-#         cursor.close()
-#         conn.close()
+		# Step 2: Fetch all members in Group 8
+		cursor.execute("""
+			SELECT m.ID, m.UserName, m.emailID, m.DoB
+			FROM members m
+			JOIN MemberGroupMapping gm ON m.ID = gm.MemberID
+			WHERE gm.GroupID = %s
+		""", (8,))
+		group_members = cursor.fetchall()
+
+		return jsonify({'group_members': group_members}), 200
+
+	except Exception as e:
+		return jsonify({'error': str(e)}), 500
+
+	finally:
+		cursor.close()
+		conn.close()
 
 
 @app.route('/authUser', methods=['POST'])
@@ -1680,6 +1706,45 @@ def download_digital_book(digital_id):
 		cursor.close()
 		conn.close()
 
+
+
+@app.route('/delete_member/<int:member_id>', methods=['POST'])
+def delete_member_cims(member_id):
+	session_id = request.headers.get('Session-ID') 
+	print("Session ID from header:", session_id)
+
+	if not session_id or not isValidSession(session_id) or not is_admin(session_id):
+		return jsonify({'error': 'Unauthorized'}), 401
+
+	conn = get_cims_connection()
+	cursor = conn.cursor()
+
+	try:
+		# 1. Check if member is in any group
+		cursor.execute("""
+			SELECT * FROM MemberGroupMapping WHERE MemberID = %s
+		""", (member_id,))
+		group_links = cursor.fetchall()
+
+		if group_links:
+			return jsonify({'error': 'Member is associated with a group and cannot be deleted'}), 400
+
+		# 2. Delete from MEMBERS table
+		cursor.execute("DELETE FROM members WHERE ID = %s", (member_id,))
+		
+		# # 3. Delete from LOGIN table
+		# cursor.execute("DELETE FROM Login WHERE Member_ID = %s", (member_id,))
+		
+		conn.commit()
+		return jsonify({'message': f'Member {member_id} deleted successfully'}), 200
+
+	except Exception as e:
+		conn.rollback()
+		return jsonify({'error': str(e)}), 500
+
+	finally:
+		cursor.close()
+		conn.close()
 
 
 
