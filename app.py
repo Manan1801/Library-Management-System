@@ -13,8 +13,9 @@ import string
 
 from dotenv import load_dotenv
 import os
-
+print("c")
 load_dotenv()
+print(os.getenv('secret_key'))
 def generate_unique_password(length=10):
 	"""
 	Generates a random alphanumeric password of given length.
@@ -23,8 +24,10 @@ def generate_unique_password(length=10):
 	return ''.join(random.choices(characters, k=length))
 
 app = Flask(__name__)
-app.secret_key = os.getenv('secret') 
+app.secret_key = os.getenv('secret_key') 
+app.config['SECRET_KEY'] = 'your_secret_key'  # Set your own secret key here
 
+print(app.secret_key)
 db_config = {
 	'host': os.getenv('DB_HOST'),
 	'user': os.getenv('DB_USER'),
@@ -38,7 +41,6 @@ db_config_cims = {
 	'password': os.getenv('DB_PASSWORD'),
 	'database': "cs432cims"
 }
-
 def get_cims_connection():
 	return mysql.connector.connect(**db_config_cims)
   
@@ -123,7 +125,7 @@ def login_required(f):
 	def decorated_function(*args, **kwargs):
 		session_id = session.get('session_id')
 		username = session.get('username')
-
+		print(f"Session ID: {session_id}, Username: {username} ibside login re	uied")  # Debugging line
 		if not session_id or not username:
 			flash("Please log in.")
 			return redirect(url_for('login'))
@@ -399,7 +401,8 @@ def user_history():
 		cursor.close()
 		conn.close()
 		
-	   
+
+
 @app.route('/user_fines')
 @login_required
 def user_fines():
@@ -651,28 +654,38 @@ def reserve_book(book_id):
 
 	return redirect(url_for('user_books'))
 
+
+def get_member_id_from_session(session_id):
+	conn = get_cims_connection()
+	cursor = conn.cursor(dictionary=True)
+	cursor.execute("SELECT MemberID FROM Login WHERE Session = %s", (session_id,))
+	result = cursor.fetchone()
+	cursor.close()
+	conn.close()
+	return result['MemberID'] if result else None
+
+
 @app.route('/pay_fine/<int:fine_id>', methods=['POST'])
-@login_required
 def pay_fine(fine_id):
-	if 'member_id' not in session:
-		flash("Please log in to pay fines", "danger")
-		return redirect(url_for('login'))
+	session_id = request.headers.get('Session-ID')
+
+	if not session_id or not isValidSession(session_id):
+		return jsonify({'error': 'Unauthorized'}), 401
+
+	member_id = get_member_id_from_session(session_id)
 
 	conn = get_db_connection()
 	cursor = conn.cursor()
 	try:
-		# Verify the fine belongs to the current user
 		cursor.execute("""
 			SELECT Member_Id FROM OVERDUE_FINE 
-			WHERE Fine_ID = %s
+			WHERE Fine_ID = %s 
 		""", (fine_id,))
 		result = cursor.fetchone()
 
-		if not result or result[0] != session['member_id']:
-			flash("Invalid fine ID", "danger")
-			return redirect(url_for('user_fines'))
+		if not result or result[0] != member_id:
+			return jsonify({'error': 'Invalid fine ID'}), 403
 
-		# Update fine payment status
 		cursor.execute("""
 			UPDATE OVERDUE_FINE 
 			SET Payment_Status = 'Paid', 
@@ -680,23 +693,21 @@ def pay_fine(fine_id):
 			WHERE Fine_ID = %s
 		""", (fine_id,))
 
-		# Add notification
 		cursor.execute("""
 			INSERT INTO NOTIFICATIONS 
 			(Member_ID, Message, Notification_Date, Type)
 			VALUES (%s, %s, NOW(), %s)
-		""", (session['member_id'], f"Fine paid (ID: {fine_id})", "Payment Confirmation"))
+		""", (member_id, f"Fine paid (ID: {fine_id})", "Overdue Fine"))
 
 		conn.commit()
-		flash('Fine paid successfully!', 'success')
+		return jsonify({'message': 'Fine paid successfully!'}), 200
+
 	except Exception as e:
 		conn.rollback()
-		flash(f"Error paying fine: {str(e)}", "danger")
+		return jsonify({'error': str(e)}), 500
 	finally:
 		cursor.close()
 		conn.close()
-
-	return redirect(url_for('user_fines'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -734,10 +745,7 @@ def login():
 				print(f"valid credentials, session id : {session_id}")
 
 				# Save session details to Flask session
-				session['member_id'] = member_id
-				session['username'] = email
-				session['role'] = user['Role']
-				session['session_id'] = session_id
+				
 
 				# ✅ Step 3: Update CIMS Login table with session ID and expiry
 				connection = get_cims_connection()
@@ -768,9 +776,27 @@ def login():
 
 				if user['Role'] == 'admin':
 					print("Admin access granted, now going to dashboard")
+					session['member_id'] = member_id
+					session['username'] = email
+					session['role'] = str(user['Role'])
+					session['session_id'] = session_id
+
+					print("Session ID:", session['session_id'])
+					print("Member ID:", session['member_id'])
+					print("Username:", session['username'])
+					print("Role:", session['role'])
 					return redirect(url_for('dashboard'))
 				else:
 					print("User access granted, now going to user dashboard")
+					session['member_id'] = member_id
+					session['username'] = email
+					session['role'] = user['Role']
+					session['session_id'] = session_id
+					print("Session ID:", session['session_id'])
+					print("Member ID:", session['member_id'])
+					print("Username:", session['username'])
+					print("Role:", session['role'])
+					print(dict(session))
 					return redirect(url_for('user_dashboard'))
 
 			error = "Invalid email or password"
@@ -842,12 +868,15 @@ def admin_required(f):
 	@wraps(f)
 	def decorated_function(*args, **kwargs):
 		print("Checking admin access...")  # 🔍 Console log
-		print(f"Session role: {session.get('role')}")  # Shows current role in terminal
+		  # Shows current role in terminal
 
 		if 'role' not in session or session['role'] != 'admin':
 			print("Access denied. Not an admin.")  # ❌ Console log
 			flash("Admin access required.")
-			return redirect(url_for('dashboard'))
+			msg = f"Unauthorized access attempt detected. by user: {session.get('username')} with session ID: {session.get('session_id')}"
+			write_log_to_file(msg, str(datetime.datetime.now()))
+			log_unauthorized_access(session.get('session_id'), session.get('username'))
+			return jsonify({'error': 'Unauthorized access','message':'you are not an admin'}),403
 
 		print("Access granted. Admin verified.")  # ✅ Console log
 		return f(*args, **kwargs)
@@ -1345,7 +1374,7 @@ def borrow_book(book_id):
 		# ✅ Validate session ID from Login table
 		cursor.execute("SELECT MemberID, Expiry FROM Login WHERE Session = %s", (session_id,))
 		session_row = cursor.fetchone()
-
+		print("Session row:", session_row)
 		if not session_row:
 			log_unauthorized_access("POST /borrow", f"Invalid session ID: {session_id}")
 			return jsonify({'error': 'Unauthorized - Invalid Session'}), 401
@@ -1594,48 +1623,55 @@ def view_issued_books():
 from datetime import date, timedelta
 from flask import flash
 
-@app.route('/issue_book', methods=['POST'])
-@login_required
-def issue_book():
-	member_id = current_user.id  # Assuming you're using Flask-Login
-	book_id = request.form.get('book_id')
-
-	conn = get_db_connection()
-	cursor = conn.cursor(dictionary=True)
-
-	# Check availability
-	cursor.execute("SELECT Quantity_Remaining FROM BOOK_AVAILABILITY WHERE BookID = %s", (book_id,))
-	book = cursor.fetchone()
-
-	if book and book['Quantity_Remaining'] > 0:
-		# Set due date (e.g., 14 days from now)
-		from datetime import datetime, timedelta
-		issue_date = datetime.now().date()
-		due_date = issue_date + timedelta(days=14)
-
-		# Insert into TRANSACTIONS
-		cursor.execute("""
-			INSERT INTO TRANSACTIONS (Member_ID, Book_ID, Issue_Date, Due_Date)
-			VALUES (%s, %s, %s, %s)
-		""", (member_id, book_id, issue_date, due_date))
-
-		# Update availability
-		cursor.execute("""
-			UPDATE BOOK_AVAILABILITY
-			SET Quantity_Remaining = Quantity_Remaining - 1,
-				Availability = CASE WHEN Quantity_Remaining - 1 > 0 THEN 'Available' ELSE 'Not Available' END
-			WHERE BookID = %s
-		""", (book_id,))
-
-		conn.commit()
-		flash('Book issued successfully!', 'success')
-	else:
-		flash('Book is currently not available.', 'danger')
-
-	cursor.close()
-	conn.close()
-	return redirect(url_for('available_books_page'))
    
+@app.route('/checked')
+@login_required
+def check():
+	print(dict(session))  # See what's actually in there
+	print("Session contents:", dict(session))
+	print(session.get('session_id'))
+
+	return f"Role: {session.get('username')}, Session ID: {session.get('session_id')}"
+
+
+
+@app.route('/download_digital_book/<int:digital_id>', methods=['POST'])
+def download_digital_book(digital_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # Check if the book exists
+        cursor.execute("""
+            SELECT Digital_Downloads FROM DIGITAL_BOOKS 
+            WHERE Digital_ID = %s
+        """, (digital_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            return jsonify({'error': 'Digital book not found'}), 404
+
+        # Increment the download count
+        cursor.execute("""
+            UPDATE DIGITAL_BOOKS
+            SET Digital_Downloads = Digital_Downloads + 1
+            WHERE Digital_ID = %s
+        """, (digital_id,))
+
+        conn.commit()
+        return jsonify({'message': 'Download count updated'}), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
+
+
+
+
+
+
 
 if __name__ == '__main__':
 	app.run(debug=True, port=5000)            
