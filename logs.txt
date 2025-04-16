@@ -29,3 +29,4 @@
 [2025-04-16 08:27:43] Session cd71ac20-2409-4cfa-9716-9e04004561ff is valid.
 [2025-04-16 08:28:11] Session cd71ac20-2409-4cfa-9716-9e04004561ff is valid.
 [2025-04-16 08:34:10] Admin added new member: Prajas Kulkarni (23110252@iitgn.ac.in) with MemberID: 24210278
+[2025-04-16 09:09:29] User logged out with session ID: 23ca07a6-51b4-4d29-9b0d-ed17ab0ee0e3

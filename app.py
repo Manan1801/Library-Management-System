@@ -1505,45 +1505,45 @@ def get_books():
 
 
 
-@app.route('/books/<int:book_id>', methods=['PUT'])
-def update_book(book_id):
-	session_id = request.headers.get('Session-ID')
+# @app.route('/books/<int:book_id>', methods=['PUT'])
+# def update_book(book_id):
+# 	session_id = request.headers.get('Session-ID')
 
-	if not isValidSession(session_id) or not is_admin(session_id):
-		log_unauthorized_access("PUT /books", "update_book")
-		return jsonify({'error': 'Unauthorized'}), 401
+# 	if not isValidSession(session_id) or not is_admin(session_id):
+# 		log_unauthorized_access("PUT /books", "update_book")
+# 		return jsonify({'error': 'Unauthorized'}), 401
 
-	data = request.get_json()
+# 	data = request.get_json()
 
-	try:
-		conn = get_db_connection()
-		cursor = conn.cursor()
+# 	try:
+# 		conn = get_db_connection()
+# 		cursor = conn.cursor()
 
-		fields = []
-		values = []
+# 		fields = []
+# 		values = []
 
-		for key in ['Book_Name', 'Book_Author', 'Book_Publication_Year', 'Total_Reviews', 'Quantity', 'BOOK_GENRE']:
-			if key in data:
-				fields.append(f"{key} = %s")
-				values.append(data[key])
+# 		for key in ['Book_Name', 'Book_Author', 'Book_Publication_Year', 'Total_Reviews', 'Quantity', 'BOOK_GENRE']:
+# 			if key in data:
+# 				fields.append(f"{key} = %s")
+# 				values.append(data[key])
 
-		if not fields:
-			return jsonify({'error': 'No fields to update'}), 400
+# 		if not fields:
+# 			return jsonify({'error': 'No fields to update'}), 400
 
-		values.append(book_id)
-		query = f"UPDATE BOOKS_DETAILS SET {', '.join(fields)} WHERE Book_ID = %s"
-		cursor.execute(query, tuple(values)) 
+# 		values.append(book_id)
+# 		query = f"UPDATE BOOKS_DETAILS SET {', '.join(fields)} WHERE Book_ID = %s"
+# 		cursor.execute(query, tuple(values)) 
 
-		conn.commit()
-		conn.close()
+# 		conn.commit()
+# 		conn.close()
 
-		if cursor.rowcount == 0:
-			return jsonify({'error': 'Book not found'}), 404
+# 		if cursor.rowcount == 0:
+# 			return jsonify({'error': 'Book not found'}), 404
 
-		return jsonify({'message': 'Book updated successfully'}), 200
+# 		return jsonify({'message': 'Book updated successfully'}), 200
 
-	except Exception as e:
-		return jsonify({'error': str(e)}), 500
+# 	except Exception as e:
+# 		return jsonify({'error': str(e)}), 500
 	
 
 @app.route('/notifications', methods=['POST'])
@@ -1645,8 +1645,7 @@ def check():
 	print("Session contents:", dict(session))
 	print(session.get('session_id'))
 
-	return f"Role: {session.get('username')}, Session ID: {session.get('session_id')}"
-
+	return f"Role: {session.get('username')}, Session ID: {session.get('session_id')}" 
 
 
 @app.route('/download_digital_book/<int:digital_id>', methods=['POST'])
