@@ -1591,7 +1591,7 @@ def send_notification():
 		email = member_row['emailID']
 		cursor_cims.close()
 		conn_cims.close()
-		send_otp(email, f"Notification from library on : {data['Type']} ",data['Message'])  # Assuming this function sends the email
+		# send_otp(email, f"Notification from library on : {data['Type']} ",data['Message'])  # Assuming this function sends the email
 		conn = get_db_connection()
 		cursor = conn.cursor()
 		cursor.execute("""
@@ -1745,9 +1745,6 @@ def delete_member_cims(member_id):
 	finally:
 		cursor.close()
 		conn.close()
-
-
-
 
 
 
