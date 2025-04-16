@@ -1,6 +1,7 @@
 import random
 import string
 import datetime
+from database import get_db_connection
 import smtplib
 import os
 from dotenv import load_dotenv
