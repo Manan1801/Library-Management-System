@@ -23,3 +23,9 @@
 [2025-04-16 07:03:07] User logged out with session ID: 6162daa3-5e8c-4533-9009-35198194dfd6
 [2025-04-16 07:56:39] User logged out with session ID: 3bfed14c-af40-4b56-9ed4-7164e6eca33a
 [2025-04-16 08:11:46] Admin added new member: Manan Chavda (23110078@iitgn.ac.in) with MemberID: 24210276
+[2025-04-16 08:26:33] Session None is invalid or not found.
+[2025-04-16 08:26:46] Session 6162daa3-5e8c-4533-9009-35198194dfd6 is invalid or not found.
+[2025-04-16 08:26:56] User logged out with session ID: 934719ff-d751-400f-ba1a-427a20b1f0f6
+[2025-04-16 08:27:43] Session cd71ac20-2409-4cfa-9716-9e04004561ff is valid.
+[2025-04-16 08:28:11] Session cd71ac20-2409-4cfa-9716-9e04004561ff is valid.
+[2025-04-16 08:34:10] Admin added new member: Prajas Kulkarni (23110252@iitgn.ac.in) with MemberID: 24210278

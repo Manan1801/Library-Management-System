@@ -1,7 +1,25 @@
 import random
 import string
 import datetime
-from database import get_db_connection
+import smtplib
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+def send_otp(email, subject,message):
+    """Send OTP via email"""
+    sender_email = os.getenv("MAIL_USERNAME")
+    sender_password = os.getenv("MAIL_PASSWORD")
+    try:
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, email, f"Subject: {subject}\n\n{message}")
+        server.quit()
+    except Exception as e:
+        raise Exception(f"Failed to send OTP: {str(e)}")
+
+
 
 def generate_unique_password(length=8):
     """Generate a random password with letters, numbers, and special characters."""

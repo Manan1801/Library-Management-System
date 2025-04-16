@@ -10,6 +10,7 @@ from session_utils import log_unauthorized_access,write_log_to_file
 
 import random
 import string
+from utils import send_otp
 
 from dotenv import load_dotenv
 import os
@@ -1079,6 +1080,9 @@ def add_member():
 			cims_cursor.execute("SELECT LAST_INSERT_ID()")
 			member_id = cims_cursor.fetchone()[0]
 
+			message = f"Dear User,\nYour details have been added to the CIMS system.\nYour login credentials are:\nUsername: {email}\nPassword: {raw_password}"
+			send_otp(email,"CIMS Login Portal Credentials",message)
+
 			# Insert into the centralized CIMS Login table
 			cims_cursor.execute("""
 				INSERT INTO Login (MemberID, password, Session, Expiry, Role)
@@ -1552,6 +1556,16 @@ def send_notification():
 		return jsonify({'error': 'Unauthorized'}), 401
 
 	try:
+		conn_cims = get_cims_connection()
+		cursor_cims = conn_cims.cursor(dictionary=True)
+		cursor_cims.execute("SELECT emailID FROM members WHERE ID = %s", (data['Member_ID'],))
+		member_row = cursor_cims.fetchone()
+		if not member_row:
+			return jsonify({'error': 'Member not found'}), 404
+		email = member_row['emailID']
+		cursor_cims.close()
+		conn_cims.close()
+		send_otp(email, f"Notification from library on : {data['Type']} ",data['Message'])  # Assuming this function sends the email
 		conn = get_db_connection()
 		cursor = conn.cursor()
 		cursor.execute("""
@@ -1637,35 +1651,35 @@ def check():
 
 @app.route('/download_digital_book/<int:digital_id>', methods=['POST'])
 def download_digital_book(digital_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        # Check if the book exists
-        cursor.execute("""
-            SELECT Digital_Downloads FROM DIGITAL_BOOKS 
-            WHERE Digital_ID = %s
-        """, (digital_id,))
-        result = cursor.fetchone()
+	conn = get_db_connection()
+	cursor = conn.cursor()
+	try:
+		# Check if the book exists
+		cursor.execute("""
+			SELECT Digital_Downloads FROM DIGITAL_BOOKS 
+			WHERE Digital_ID = %s
+		""", (digital_id,))
+		result = cursor.fetchone()
 
-        if not result:
-            return jsonify({'error': 'Digital book not found'}), 404
+		if not result:
+			return jsonify({'error': 'Digital book not found'}), 404
 
-        # Increment the download count
-        cursor.execute("""
-            UPDATE DIGITAL_BOOKS
-            SET Digital_Downloads = Digital_Downloads + 1
-            WHERE Digital_ID = %s
-        """, (digital_id,))
+		# Increment the download count
+		cursor.execute("""
+			UPDATE DIGITAL_BOOKS
+			SET Digital_Downloads = Digital_Downloads + 1
+			WHERE Digital_ID = %s
+		""", (digital_id,))
 
-        conn.commit()
-        return jsonify({'message': 'Download count updated'}), 200
+		conn.commit()
+		return jsonify({'message': 'Download count updated'}), 200
 
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'error': str(e)}), 500
-    finally:
-        cursor.close()
-        conn.close()
+	except Exception as e:
+		conn.rollback()
+		return jsonify({'error': str(e)}), 500
+	finally:
+		cursor.close()
+		conn.close()
 
 
 

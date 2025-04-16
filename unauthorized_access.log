@@ -35,3 +35,5 @@
 [2025-04-16 05:30:01] Unauthorized access attempt by 'None' on 'None'
 [2025-04-16 05:30:24] Unauthorized access attempt by 'None' on 'None'
 [2025-04-16 05:33:25] Unauthorized access attempt by 'None' on 'None'
+[2025-04-16 08:26:33] Unauthorized access attempt by 'POST /notifications' on 'send_notification'
+[2025-04-16 08:26:46] Unauthorized access attempt by 'POST /notifications' on 'send_notification'
