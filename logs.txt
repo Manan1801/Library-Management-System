@@ -67,3 +67,6 @@
 [2025-04-16 14:23:34] User logged out with session ID: 539f4ecf-fa2d-40be-ba8d-955ea449d44a
 [2025-04-16 14:25:50] Session 0660d163-0a0b-4cb3-aa56-54b1bdf653e8 is valid.
 [2025-04-16 14:28:31] Session 0660d163-0a0b-4cb3-aa56-54b1bdf653e8 is valid.
+[2025-04-18 15:11:25] User logged out with session ID: 9ed478f1-e68a-4d40-a4ec-7337c0afecfc
+[2025-04-18 15:13:30] User logged out with session ID: 5caca8ef-8e31-411a-8076-61fb37b729d6
+[2025-04-18 15:17:19] Unauthorized access attempt detected. by user: lakshya@iitgn.ac.in with session ID: 33d21c69-5880-4bc7-a337-4b324f570628
