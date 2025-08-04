@@ -1,13 +1,19 @@
 import random
 import string
 import datetime
+<<<<<<< HEAD
 from database import get_db_connection
+=======
+>>>>>>> upstream/OTP
 import smtplib
 import os
 from dotenv import load_dotenv
 load_dotenv()
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/OTP
 def send_otp(email, subject,message):
     """Send OTP via email"""
     sender_email = os.getenv("MAIL_USERNAME")
@@ -19,7 +25,11 @@ def send_otp(email, subject,message):
         server.sendmail(sender_email, email, f"Subject: {subject}\n\n{message}")
         server.quit()
     except Exception as e:
+<<<<<<< HEAD
         raise Exception(f"Failed to send OTP: {str(e)}")
+=======
+        raise Exception(f"Failed to send OTP: {str(e)}")
+>>>>>>> upstream/OTP
 
 
 

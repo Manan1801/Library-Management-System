@@ -10,11 +10,13 @@ from session_utils import log_unauthorized_access,write_log_to_file
 from utils import send_otp
 import random
 import string
+from utils import send_otp
 
 from dotenv import load_dotenv
 import os
-
+print("c")
 load_dotenv()
+print(os.getenv('secret_key'))
 def generate_unique_password(length=10):
     """
     Generates a random alphanumeric password of given length.
@@ -23,8 +25,10 @@ def generate_unique_password(length=10):
     return ''.join(random.choices(characters, k=length))
 
 app = Flask(__name__)
-app.secret_key = os.getenv('secret') 
+app.secret_key = os.getenv('secret_key') 
+app.config['SECRET_KEY'] = 'your_secret_key'  # Set your own secret key here
 
+print(app.secret_key)
 db_config = {
     'host': os.getenv('DB_HOST'),
     'user': os.getenv('DB_USER'),
@@ -38,7 +42,6 @@ db_config_cims = {
     'password': os.getenv('DB_PASSWORD'),
     'database': "cs432cims"
 }
-
 def get_cims_connection():
     return mysql.connector.connect(**db_config_cims)
   
@@ -119,6 +122,7 @@ from functools import wraps
 from flask import session, redirect, url_for, flash
 
 def login_required(f):
+<<<<<<< HEAD
     @wraps(f)
     def decorated_function(*args, **kwargs):
         session_id = session.get('session_id')
@@ -127,6 +131,16 @@ def login_required(f):
         if not session_id or not username:
             flash("Please log in.")
             return redirect(url_for('login'))
+=======
+	@wraps(f)
+	def decorated_function(*args, **kwargs):
+		session_id = session.get('session_id')
+		username = session.get('username')
+		print(f"Session ID: {session_id}, Username: {username} ibside login re	uied")  # Debugging line
+		if not session_id or not username:
+			flash("Please log in.")
+			return redirect(url_for('login'))
+>>>>>>> upstream/OTP
 
         conn = get_cims_connection()
         cursor = conn.cursor(dictionary=True)
@@ -387,6 +401,7 @@ def user_history():
         """, (session['member_id'],))
         history = cursor.fetchall()
 
+<<<<<<< HEAD
         return render_template(
             'user_history.html',
             history=history,
@@ -400,6 +415,22 @@ def user_history():
         conn.close()
         
        
+=======
+		return render_template(
+			'user_history.html',
+			history=history,
+			active_page='history'
+		)
+	except Exception as e:
+		flash(f"Error loading reading history: {str(e)}", "danger")
+		return redirect(url_for('user_dashboard'))
+	finally:
+		cursor.close()
+		conn.close()
+		
+
+
+>>>>>>> upstream/OTP
 @app.route('/user_fines')
 @login_required
 def user_fines():
@@ -651,9 +682,20 @@ def reserve_book(book_id):
 
     return redirect(url_for('user_books'))
 
+
+def get_member_id_from_session(session_id):
+	conn = get_cims_connection()
+	cursor = conn.cursor(dictionary=True)
+	cursor.execute("SELECT MemberID FROM Login WHERE Session = %s", (session_id,))
+	result = cursor.fetchone()
+	cursor.close()
+	conn.close()
+	return result['MemberID'] if result else None
+
+
 @app.route('/pay_fine/<int:fine_id>', methods=['POST'])
-@login_required
 def pay_fine(fine_id):
+<<<<<<< HEAD
     if 'member_id' not in session:
         flash("Please log in to pay fines", "danger")
         return redirect(url_for('login'))
@@ -698,6 +740,50 @@ def pay_fine(fine_id):
 
     return redirect(url_for('user_fines'))
 
+=======
+	session_id = request.headers.get('Session-ID')
+
+	if not session_id or not isValidSession(session_id):
+		return jsonify({'error': 'Unauthorized'}), 401
+
+	member_id = get_member_id_from_session(session_id)
+
+	conn = get_db_connection()
+	cursor = conn.cursor()
+	try:
+		cursor.execute("""
+			SELECT Member_Id FROM OVERDUE_FINE 
+			WHERE Fine_ID = %s 
+		""", (fine_id,))
+		result = cursor.fetchone()
+
+		if not result or result[0] != member_id:
+			return jsonify({'error': 'Invalid fine ID'}), 403
+
+		cursor.execute("""
+			UPDATE OVERDUE_FINE 
+			SET Payment_Status = 'Paid', 
+				Payment_Date = CURDATE() 
+			WHERE Fine_ID = %s
+		""", (fine_id,))
+
+		cursor.execute("""
+			INSERT INTO NOTIFICATIONS 
+			(Member_ID, Message, Notification_Date, Type)
+			VALUES (%s, %s, NOW(), %s)
+		""", (member_id, f"Fine paid (ID: {fine_id})", "Overdue Fine"))
+
+		conn.commit()
+		return jsonify({'message': 'Fine paid successfully!'}), 200
+
+	except Exception as e:
+		conn.rollback()
+		return jsonify({'error': str(e)}), 500
+	finally:
+		cursor.close()
+		conn.close()
+
+>>>>>>> upstream/OTP
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -733,8 +819,13 @@ def login():
                 print(expiry_time)
                 print(f"valid credentials, session id : {session_id}")
 
+<<<<<<< HEAD
                 # Save session details to Flask session
             
+=======
+				# Save session details to Flask session
+				
+>>>>>>> upstream/OTP
 
                 # ✅ Step 3: Update CIMS Login table with session ID and expiry
                 connection = get_cims_connection()
@@ -774,7 +865,34 @@ def login():
                     print("User access granted, now going to user dashboard")
                     return redirect(url_for('user_dashboard'))
 
+<<<<<<< HEAD
             error = "Invalid email or password"
+=======
+				if user['Role'] == 'admin':
+					print("Admin access granted, now going to dashboard")
+					session['member_id'] = member_id
+					session['username'] = email
+					session['role'] = str(user['Role'])
+					session['session_id'] = session_id
+
+					print("Session ID:", session['session_id'])
+					print("Member ID:", session['member_id'])
+					print("Username:", session['username'])
+					print("Role:", session['role'])
+					return redirect(url_for('dashboard'))
+				else:
+					print("User access granted, now going to user dashboard")
+					session['member_id'] = member_id
+					session['username'] = email
+					session['role'] = user['Role']
+					session['session_id'] = session_id
+					print("Session ID:", session['session_id'])
+					print("Member ID:", session['member_id'])
+					print("Username:", session['username'])
+					print("Role:", session['role'])
+					print(dict(session))
+					return redirect(url_for('user_dashboard'))
+>>>>>>> upstream/OTP
 
         except Exception as e:
             error = f"Login error: {str(e)}"
@@ -840,6 +958,7 @@ from functools import wraps
 from flask import redirect, url_for, flash  
 
 def admin_required(f):
+<<<<<<< HEAD
     @wraps(f)
     def decorated_function(*args, **kwargs):
         print("Checking admin access...")  # 🔍 Console log
@@ -849,6 +968,20 @@ def admin_required(f):
             print("Access denied. Not an admin.")  # ❌ Console log
             flash("Admin access required.")
             return redirect(url_for('dashboard'))
+=======
+	@wraps(f)
+	def decorated_function(*args, **kwargs):
+		print("Checking admin access...")  # 🔍 Console log
+		  # Shows current role in terminal
+
+		if 'role' not in session or session['role'] != 'admin':
+			print("Access denied. Not an admin.")  # ❌ Console log
+			flash("Admin access required.")
+			msg = f"Unauthorized access attempt detected. by user: {session.get('username')} with session ID: {session.get('session_id')}"
+			write_log_to_file(msg, str(datetime.datetime.now()))
+			log_unauthorized_access(session.get('session_id'), session.get('username'))
+			return jsonify({'error': 'Unauthorized access','message':'you are not an admin'}),403
+>>>>>>> upstream/OTP
 
         print("Access granted. Admin verified.")  # ✅ Console log
         return f(*args, **kwargs)
@@ -1049,6 +1182,7 @@ def add_member():
             """, (username, email, dob))
             cims_conn.commit()
 
+<<<<<<< HEAD
             # Get the newly created MemberID
             cims_cursor.execute("SELECT LAST_INSERT_ID()")
             member_id = cims_cursor.fetchone()[0]
@@ -1059,6 +1193,32 @@ def add_member():
                 INSERT INTO Login (MemberID, password, Session, Expiry, Role)
                 VALUES (%s, %s, %s, %s, %s)
             """, (member_id, hashed_password, None, None, 'user'))
+=======
+			# Get the newly created MemberID
+			cims_cursor.execute("SELECT LAST_INSERT_ID()")
+			member_id = cims_cursor.fetchone()[0]
+			message = f"""
+Dear User,
+
+Welcome to the Centralized Information Management System (CIMS).
+
+We are pleased to inform you that your account has been successfully created. Below are your login credentials for accessing the CIMS portal:
+
+----------------------------------------
+Username : {email}
+Password : {raw_password}
+----------------------------------------
+
+For security purposes, please ensure that you change your password after logging in for the first time.
+
+If you have any questions or face any issues, feel free to contact the system administrator.
+
+Best regards,  
+Library Management Team
+"""
+			send_otp(email, "Your CIMS Portal Login Credentials", message)
+
+>>>>>>> upstream/OTP
 
             cims_conn.commit()
 
@@ -1114,43 +1274,51 @@ def logout():
 
 
 
-# @app.route('/portfolio')
-# def portfolio():
-#     # If user is already logged in, member_id should be in session
-#     member_id = session['member_id']  # Assume it's guaranteed to exist
+@app.route('/api/portfolio', methods=['GET'])
+def api_portfolio():
+	# Debugging: Check what session contains
+	print("SESSION:     ",5);session_id = request.headers.get('Session-ID')
 
-#     try:
-#         conn = get_cims_connection()
-#         cursor = conn.cursor(dictionary=True)
+	print("SESSION ID:  ",session_id)
+	conn = get_cims_connection()
+	cursor = conn.cursor(dictionary=True)
+	cursor.execute("SELECT * FROM Login WHERE Session = %s", (session_id,))
+	result = cursor.fetchone()
 
-#         # Check if the user is in GroupID 8
-#         cursor.execute("""
-#             SELECT * FROM GroupMembers WHERE MemberID = %s AND GroupID = %s
-#         """, (member_id, 8))
-#         is_in_group = cursor.fetchone()
 
-#         if not is_in_group:
-#             flash("You are not authorized to view this group.")
-#             return redirect(url_for('dashboard'))
+	member_id = result['MemberID']
+	print("Member ID:   ",member_id)
 
-#         # Fetch all group 8 members
-#         cursor.execute("""
-#             SELECT m.ID, m.UserName, m.emailID, m.DoB
-#             FROM members m
-#             JOIN GroupMembers gm ON m.ID = gm.MemberID
-#             WHERE gm.GroupID = %s
-#         """, (8,))
-#         group_members = cursor.fetchall()
+	try:
+		conn = get_cims_connection()
+		cursor = conn.cursor(dictionary=True)
 
-#         return render_template('portfolio.html', members=group_members)
+		# Step 1: Check if the user is in GroupID 8
+		cursor.execute("""
+			SELECT * FROM MemberGroupMapping WHERE MemberID = %s AND GroupID = %s
+		""", (member_id, 8))
+		is_in_group = cursor.fetchone()
 
-#     except Exception as e:
-#         flash(f"Error fetching portfolio: {str(e)}")
-#         return redirect(url_for('dashboard'))
+		if not is_in_group:
+			return jsonify({'error': 'Access Denied'}), 403
 
-#     finally:
-#         cursor.close()
-#         conn.close()
+		# Step 2: Fetch all members in Group 8
+		cursor.execute("""
+			SELECT m.ID, m.UserName, m.emailID, m.DoB
+			FROM members m
+			JOIN MemberGroupMapping gm ON m.ID = gm.MemberID
+			WHERE gm.GroupID = %s
+		""", (8,))
+		group_members = cursor.fetchall()
+
+		return jsonify({'group_members': group_members}), 200
+
+	except Exception as e:
+		return jsonify({'error': str(e)}), 500
+
+	finally:
+		cursor.close()
+		conn.close()
 
 
 @app.route('/authUser', methods=['POST'])
@@ -1346,6 +1514,7 @@ def borrow_book(book_id):
         conn = get_cims_connection()
         cursor = conn.cursor(dictionary=True)
 
+<<<<<<< HEAD
         # ✅ Validate session ID from Login table
         cursor.execute("SELECT MemberID, Expiry FROM Login WHERE Session = %s", (session_id,))
         session_row = cursor.fetchone()
@@ -1353,6 +1522,15 @@ def borrow_book(book_id):
         if not session_row:
             log_unauthorized_access("POST /borrow", f"Invalid session ID: {session_id}")
             return jsonify({'error': 'Unauthorized - Invalid Session'}), 401
+=======
+		# ✅ Validate session ID from Login table
+		cursor.execute("SELECT MemberID, Expiry FROM Login WHERE Session = %s", (session_id,))
+		session_row = cursor.fetchone()
+		print("Session row:", session_row)
+		if not session_row:
+			log_unauthorized_access("POST /borrow", f"Invalid session ID: {session_id}")
+			return jsonify({'error': 'Unauthorized - Invalid Session'}), 401
+>>>>>>> upstream/OTP
 
         # ✅ Check if session has expired
         import time
@@ -1476,6 +1654,7 @@ def get_books():
 
 
 
+<<<<<<< HEAD
 @app.route('/books/<int:book_id>', methods=['PUT'])
 def update_book(book_id):
     session_id = request.headers.get('Session-ID')
@@ -1516,6 +1695,48 @@ def update_book(book_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     
+=======
+# @app.route('/books/<int:book_id>', methods=['PUT'])
+# def update_book(book_id):
+# 	session_id = request.headers.get('Session-ID')
+
+# 	if not isValidSession(session_id) or not is_admin(session_id):
+# 		log_unauthorized_access("PUT /books", "update_book")
+# 		return jsonify({'error': 'Unauthorized'}), 401
+
+# 	data = request.get_json()
+
+# 	try:
+# 		conn = get_db_connection()
+# 		cursor = conn.cursor()
+
+# 		fields = []
+# 		values = []
+
+# 		for key in ['Book_Name', 'Book_Author', 'Book_Publication_Year', 'Total_Reviews', 'Quantity', 'BOOK_GENRE']:
+# 			if key in data:
+# 				fields.append(f"{key} = %s")
+# 				values.append(data[key])
+
+# 		if not fields:
+# 			return jsonify({'error': 'No fields to update'}), 400
+
+# 		values.append(book_id)
+# 		query = f"UPDATE BOOKS_DETAILS SET {', '.join(fields)} WHERE Book_ID = %s"
+# 		cursor.execute(query, tuple(values)) 
+
+# 		conn.commit()
+# 		conn.close()
+
+# 		if cursor.rowcount == 0:
+# 			return jsonify({'error': 'Book not found'}), 404
+
+# 		return jsonify({'message': 'Book updated successfully'}), 200
+
+# 	except Exception as e:
+# 		return jsonify({'error': str(e)}), 500
+	
+>>>>>>> upstream/OTP
 
 @app.route('/notifications', methods=['POST'])
 def send_notification():
@@ -1526,6 +1747,7 @@ def send_notification():
         log_unauthorized_access("POST /notifications", "send_notification")
         return jsonify({'error': 'Unauthorized'}), 401
 
+<<<<<<< HEAD
     try:
         conn_cims = get_cims_connection()
         cursor_cims = conn_cims.cursor(dictionary=True)
@@ -1549,6 +1771,30 @@ def send_notification():
         return jsonify({'message': 'Notification sent successfully'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+=======
+	try:
+		conn_cims = get_cims_connection()
+		cursor_cims = conn_cims.cursor(dictionary=True)
+		cursor_cims.execute("SELECT emailID FROM members WHERE ID = %s", (data['Member_ID'],))
+		member_row = cursor_cims.fetchone()
+		if not member_row:
+			return jsonify({'error': 'Member not found'}), 404
+		email = member_row['emailID']
+		cursor_cims.close()
+		conn_cims.close()
+		# send_otp(email, f"Notification from library on : {data['Type']} ",data['Message'])  # Assuming this function sends the email
+		conn = get_db_connection()
+		cursor = conn.cursor()
+		cursor.execute("""
+			INSERT INTO NOTIFICATIONS (Member_ID, Message, Notification_Date, Type)
+			VALUES (%s, %s, NOW(), %s)
+		""", (data['Member_ID'], data['Message'], data['Type']))
+		conn.commit()
+		conn.close()
+		return jsonify({'message': 'Notification sent successfully'}), 201
+	except Exception as e:
+		return jsonify({'error': str(e)}), 500
+>>>>>>> upstream/OTP
 
 @app.route('/available_books_page')
 @login_required
@@ -1609,8 +1855,10 @@ def view_issued_books():
 from datetime import date, timedelta
 from flask import flash
 
-@app.route('/issue_book', methods=['POST'])
+   
+@app.route('/checked')
 @login_required
+<<<<<<< HEAD
 def issue_book():
     member_id = current_user.id  # Assuming you're using Flask-Login
     book_id = request.form.get('book_id')
@@ -1651,6 +1899,89 @@ def issue_book():
     conn.close()
     return redirect(url_for('available_books_page'))
    
+=======
+def check():
+	print(dict(session))  # See what's actually in there
+	print("Session contents:", dict(session))
+	print(session.get('session_id'))
+
+	return f"Role: {session.get('username')}, Session ID: {session.get('session_id')}" 
+
+
+@app.route('/download_digital_book/<int:digital_id>', methods=['POST'])
+def download_digital_book(digital_id):
+	conn = get_db_connection()
+	cursor = conn.cursor()
+	try:
+		# Check if the book exists
+		cursor.execute("""
+			SELECT Digital_Downloads FROM DIGITAL_BOOKS 
+			WHERE Digital_ID = %s
+		""", (digital_id,))
+		result = cursor.fetchone()
+
+		if not result:
+			return jsonify({'error': 'Digital book not found'}), 404
+
+		# Increment the download count
+		cursor.execute("""
+			UPDATE DIGITAL_BOOKS
+			SET Digital_Downloads = Digital_Downloads + 1
+			WHERE Digital_ID = %s
+		""", (digital_id,))
+
+		conn.commit()
+		return jsonify({'message': 'Download count updated'}), 200
+
+	except Exception as e:
+		conn.rollback()
+		return jsonify({'error': str(e)}), 500
+	finally:
+		cursor.close()
+		conn.close()
+
+
+
+@app.route('/delete_member/<int:member_id>', methods=['POST'])
+def delete_member_cims(member_id):
+	session_id = request.headers.get('Session-ID') 
+	print("Session ID from header:", session_id)
+
+	if not session_id or not isValidSession(session_id) or not is_admin(session_id):
+		return jsonify({'error': 'Unauthorized'}), 401
+
+	conn = get_cims_connection()
+	cursor = conn.cursor()
+
+	try:
+		# 1. Check if member is in any group
+		cursor.execute("""
+			SELECT * FROM MemberGroupMapping WHERE MemberID = %s
+		""", (member_id,))
+		group_links = cursor.fetchall()
+
+		if group_links:
+			return jsonify({'error': 'Member is associated with a group and cannot be deleted'}), 400
+
+		# 2. Delete from MEMBERS table
+		cursor.execute("DELETE FROM members WHERE ID = %s", (member_id,))
+		
+		# # 3. Delete from LOGIN table
+		# cursor.execute("DELETE FROM Login WHERE Member_ID = %s", (member_id,))
+		
+		conn.commit()
+		return jsonify({'message': f'Member {member_id} deleted successfully'}), 200
+
+	except Exception as e:
+		conn.rollback()
+		return jsonify({'error': str(e)}), 500
+
+	finally:
+		cursor.close()
+		conn.close()
+
+
+>>>>>>> upstream/OTP
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)            
