@@ -1,6 +1,7 @@
 import random
 import string
 import datetime
+from database import get_db_connection
 import smtplib
 import os
 from dotenv import load_dotenv
@@ -17,7 +18,7 @@ def send_otp(email, subject,message):
         server.sendmail(sender_email, email, f"Subject: {subject}\n\n{message}")
         server.quit()
     except Exception as e:
-        raise Exception(f"Failed to send OTP: {str(e)}")
+        raise Exception(f"Failed to send OTP: {str(e)}")
 
 
 
