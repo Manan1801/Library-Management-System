@@ -6,6 +6,10 @@ A complete **Library Management System** built to manage books, users, and libra
 
 🎥 **[Watch the Demo Video](https://www.youtube.com/watch?v=EUgHJfPR3WE)**
 
+[![Watch on YouTube](iitgn_logo.png)](https://www.youtube.com/watch?v=EUgHJfPR3WE)
+
+> *This video demonstrates all the features including book handling, user registration, issuing/returning books, and the automated email notifications.*
+
 
 ---
 
@@ -59,11 +63,6 @@ A complete **Library Management System** built to manage books, users, and libra
 ---
 
 
-🎥 **[Watch the Demo Video](https://www.youtube.com/watch?v=EUgHJfPR3WE)**
-
-
-
-[![Watch on YouTube](iitgn_logo.png)](https://www.youtube.com/watch?v=EUgHJfPR3WE)
 
 
 > *This video demonstrates all the features including book handling, user registration, issuing/returning books, and the automated email notifications.*
